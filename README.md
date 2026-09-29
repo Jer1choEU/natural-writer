@@ -117,3 +117,21 @@ L'ultimo passaggio confronta la bozza con l'originale per evitare:
 - rafforzamento o attenuazione involontaria delle tesi;
 - cambiamenti nei rapporti causali;
 - perdita di incertezze o cautele presenti nel testo originale.
+
+
+## Preset di stile
+
+L'MVP include profili stilistici riutilizzabili basati su caratteristiche astratte di scrittura, non sull'imitazione di una persona specifica:
+
+- Naturale equilibrato
+- Editoriale autorevole
+- Social diretto
+- LinkedIn personale
+- Giornalistico asciutto
+- Commento politico incisivo
+- Storytelling personale
+- Minimalista
+- Divulgazione chiara
+- Post civico / attivismo
+
+Ogni preset modifica ritmo, densità, struttura, livello di formalità e tipo di apertura/chiusura, mantenendo i controlli di fedeltà sul contenuto.
