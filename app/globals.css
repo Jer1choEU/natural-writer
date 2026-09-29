@@ -75,6 +75,7 @@ textarea::placeholder { color: #59616d; }
   display: flex;
   flex-direction: column;
   justify-content: center;
+  align-self: stretch;
   gap: 10px;
   width: 100%;
 }
