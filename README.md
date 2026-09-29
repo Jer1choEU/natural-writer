@@ -190,3 +190,13 @@ Il workflow esegue typecheck, benchmark e carica i risultati come artifact per 1
 Natural Writer usa **Gemini 3.5 Flash-Lite** come modello predefinito per l'MVP, così il progetto può partire usando il free tier della Gemini Developer API.
 
 Il provider è isolato dal resto del motore, quindi in futuro sarà possibile aggiungere OpenAI, OpenRouter, Mistral o altri backend senza riscrivere l'interfaccia.
+
+
+## Quality Judge
+
+Il benchmark combina due livelli di valutazione:
+
+- **Heuristic score**: segnali tecnici deterministici su lunghezza, ripetizioni, formule generiche e struttura.
+- **Quality Judge**: valutazione editoriale separata su fedeltà, naturalezza, ritmo, specificità e assenza di tic artificiali.
+
+Il judge usa `GEMINI_JUDGE_MODEL` (default: `gemini-3.5-flash-lite`) e non blocca l'intera run se temporaneamente non disponibile.
