@@ -4,24 +4,24 @@ Natural Writer è una web app che trasforma testi rigidi, impersonali o generati
 
 ## Obiettivo
 
-Il progetto non nasce per "bypassare" sistemi di rilevazione, ma come editor di riscrittura stilistica.
+Il progetto è un editor di riscrittura stilistica. Non ha come obiettivo l'elusione di sistemi di rilevazione.
 
 Principi:
-- preservare significato e fatti;
+- preservare significato, fatti, nomi e numeri;
 - migliorare ritmo, lessico e naturalezza;
 - evitare formule ripetitive e strutture eccessivamente uniformi;
 - adattare il testo al contesto e al pubblico;
-- consentire la trasformazione diretta in un post social pronto alla pubblicazione.
+- trasformare direttamente un testo in un post social pronto all'uso.
 
 ## MVP
 
 ### Modalità
 - **Naturale** — riscrittura equilibrata e scorrevole.
 - **Professionale** — più chiara, ordinata e adatta a contesti di lavoro.
-- **Social post** — trasforma il contenuto in un post per social network.
+- **Social post** — adatta il contenuto a un social network.
 
 ### Social post
-Piattaforme iniziali:
+Piattaforme:
 - Instagram
 - Facebook
 - LinkedIn
@@ -30,41 +30,57 @@ Piattaforme iniziali:
 
 Parametri:
 - tono;
-- lunghezza;
 - intensità della riscrittura;
 - emoji sì/no;
 - call to action sì/no;
 - domanda finale sì/no.
 
-## Architettura prevista
+## Humanization Engine
+
+Il motore usa tre passaggi:
 
 ```
-input
+testo originale
   ↓
 analisi stilistica
   ↓
-piano di riscrittura
-  ↓
 riscrittura
   ↓
-controllo di fedeltà
+controllo di fedeltà + rifinitura
   ↓
-rifinitura
-  ↓
-output
+output finale
 ```
 
-L'interfaccia e il motore di trasformazione devono rimanere separati, così da poter modificare modelli, prompt e regole senza riscrivere la UI.
+L'ultimo passaggio confronta originale e bozza per ridurre alterazioni di significato e aggiunte non supportate.
 
-## Stack iniziale
+## Stack
 
 - Next.js
 - TypeScript
 - React
-- API server-side
-- provider LLM configurabile
-- persistenza opzionale in una fase successiva
+- OpenAI Responses API
+- provider e modello configurabili via variabili d'ambiente
+
+## Configurazione
+
+Copia `.env.example` in `.env.local` e imposta:
+
+```bash
+OPENAI_API_KEY=...
+OPENAI_MODEL=gpt-6-astra
+```
+
+La chiave viene letta solo lato server.
+
+## Avvio locale
+
+```bash
+npm install
+npm run dev
+```
+
+Poi apri `http://localhost:3000`.
 
 ## Stato
 
-🚧 MVP in costruzione.
+🚧 MVP funzionante lato codice. Serve configurare `OPENAI_API_KEY` nell'ambiente di deploy per effettuare trasformazioni reali.
