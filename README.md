@@ -84,3 +84,36 @@ Poi apri `http://localhost:3000`.
 ## Stato
 
 🚧 MVP funzionante lato codice. Serve configurare `OPENAI_API_KEY` nell'ambiente di deploy per effettuare trasformazioni reali.
+
+
+## Regole qualitative
+
+Natural Writer non si limita a parafrasare. Il motore cerca di ridurre alcuni pattern stilistici che rendono un testo rigido o artificiale, tra cui:
+
+- frasi tutte della stessa lunghezza;
+- paragrafi troppo simmetrici;
+- abuso di formule come `non solo... ma anche`;
+- conclusioni automatiche e mini-riassunti a fine paragrafo;
+- elenchi non necessari;
+- abuso di parole enfatiche come `fondamentale`, `cruciale`, `essenziale`;
+- nominalizzazioni e linguaggio astratto;
+- eccesso di due punti e trattini;
+- transizioni generiche;
+- ripetizioni semantiche;
+- hook, CTA e domande finali inseriti meccanicamente nei post social.
+
+### Intensità
+
+- **Leggera**: corregge soprattutto rigidità e ripetizioni, mantenendo struttura e lessico il più possibile.
+- **Media**: modifica ritmo e sintassi con libertà moderata.
+- **Profonda**: può ristrutturare periodi e paragrafi, mantenendo invariati significato e fatti.
+
+### Controllo di fedeltà
+
+L'ultimo passaggio confronta la bozza con l'originale per evitare:
+
+- alterazioni di numeri o nomi;
+- aggiunte non supportate;
+- rafforzamento o attenuazione involontaria delle tesi;
+- cambiamenti nei rapporti causali;
+- perdita di incertezze o cautele presenti nel testo originale.
