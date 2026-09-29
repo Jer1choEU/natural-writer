@@ -42,6 +42,7 @@ jobs:
           BENCHMARK_LIMIT: ${{ inputs.benchmark_limit || '1' }}
           BENCHMARK_PRESETS: balanced,social-direct,journalistic
           BENCHMARK_INTENSITIES: media
+          GEMINI_JUDGE_MODEL: gemini-3.5-flash-lite
         run: npm run benchmark
 
       - name: Upload benchmark results
@@ -54,3 +55,5 @@ jobs:
           retention-days: 14
 
 # benchmark-resilience-v2
+
+# qualitative-judge-v1
