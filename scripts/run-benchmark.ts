@@ -3,6 +3,7 @@ import path from "node:path";
 import { humanizeText, type HumanizeOptions } from "../lib/humanizer";
 import { BENCHMARK_SAMPLES } from "../benchmarks/samples";
 import { analyzeText, heuristicScore } from "../benchmarks/scoring";
+import { judgeRewrite } from "../benchmarks/quality-judge";
 
 const allPresets = [
   "balanced",
@@ -68,6 +69,14 @@ async function main() {
           const originalMetrics = analyzeText(sample.text);
           const rewrittenMetrics = analyzeText(rewritten.text);
 
+          let qualityJudge = null;
+          try {
+            qualityJudge = await judgeRewrite(sample.text, rewritten.text);
+          } catch (judgeError) {
+            console.error(`${sample.id} | ${preset} | ${intensity} | ${model} | JUDGE FAILED`);
+            console.error(judgeError);
+          }
+
           results.push({
             sampleId: sample.id,
             category: sample.category,
@@ -79,11 +88,12 @@ async function main() {
             originalMetrics,
             rewrittenMetrics,
             heuristicScore: heuristicScore(originalMetrics, rewrittenMetrics),
+            qualityJudge,
             status: "ok",
           });
 
           console.log(
-            `${sample.id} | ${preset} | ${intensity} | ${model} | score ${results.at(-1)?.heuristicScore}`
+            `${sample.id} | ${preset} | ${intensity} | ${model} | heuristic ${results.at(-1)?.heuristicScore} | quality ${qualityJudge?.overall ?? "n/a"}`
           );
         } catch (error) {
           console.error(`${sample.id} | ${preset} | ${intensity} | ${model} | FAILED`);
@@ -114,13 +124,17 @@ async function main() {
   const jsonPath = path.join(outDir, "latest.json");
   await fs.writeFile(jsonPath, JSON.stringify(results, null, 2));
 
-  const grouped = new Map<string, { total: number; count: number }>();
+  const grouped = new Map<string, { total: number; count: number; qualityTotal: number; qualityCount: number }>();
   for (const row of results) {
     if (row.status !== "ok" || row.heuristicScore == null) continue;
     const key = `${row.model}::${row.preset}::${row.intensity}`;
-    const current = grouped.get(key) || { total: 0, count: 0 };
+    const current = grouped.get(key) || { total: 0, count: 0, qualityTotal: 0, qualityCount: 0 };
     current.total += row.heuristicScore;
     current.count += 1;
+    if (row.qualityJudge?.overall != null) {
+      current.qualityTotal += row.qualityJudge.overall;
+      current.qualityCount += 1;
+    }
     grouped.set(key, current);
   }
 
@@ -131,11 +145,15 @@ async function main() {
         model,
         preset,
         intensity,
-        avgScore: Number((value.total / value.count).toFixed(2)),
+        avgHeuristicScore: Number((value.total / value.count).toFixed(2)),
+        avgQualityScore:
+          value.qualityCount > 0
+            ? Number((value.qualityTotal / value.qualityCount).toFixed(2))
+            : null,
         samples: value.count,
       };
     })
-    .sort((a, b) => b.avgScore - a.avgScore);
+    .sort((a, b) => (b.avgQualityScore ?? -1) - (a.avgQualityScore ?? -1));
 
   await fs.writeFile(
     path.join(outDir, "summary.json"),
