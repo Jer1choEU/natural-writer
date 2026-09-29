@@ -3,11 +3,6 @@ import { humanizeText, type HumanizeOptions } from "@/lib/humanizer";
 
 export const runtime = "nodejs";
 
-const allowedModes = new Set(["natural", "professional", "social"]);
-const allowedIntensities = new Set(["leggera", "media", "profonda"]);
-const allowedPlatforms = new Set(["instagram", "facebook", "linkedin", "x", "threads"]);
-const allowedPresets = new Set(["balanced", "editorial", "social-direct", "linkedin-personal", "journalistic", "political-comment", "storytelling", "minimal", "explainer", "civic"]);
-
 export async function POST(request: Request) {
   try {
     if (!process.env.GEMINI_API_KEY) {
@@ -31,23 +26,15 @@ export async function POST(request: Request) {
       );
     }
 
-    if (!allowedModes.has(body.mode)) {
-      return NextResponse.json({ error: "Modalità non valida." }, { status: 400 });
-    }
-
     const options: HumanizeOptions = {
-      mode: body.mode,
-      tone: typeof body.tone === "string" ? body.tone.slice(0, 50) : "diretto",
-      intensity: allowedIntensities.has(body.intensity) ? body.intensity : "media",
-      emoji: Boolean(body.emoji),
-      cta: Boolean(body.cta),
-      question: Boolean(body.question),
-      preset: allowedPresets.has(body.preset) ? body.preset : "balanced",
+      mode: "social",
+      tone: "diretto",
+      intensity: "media",
+      preset: "balanced",
+      emoji: false,
+      cta: false,
+      question: false,
     };
-
-    if (body.mode === "social") {
-      options.platform = allowedPlatforms.has(body.platform) ? body.platform : "instagram";
-    }
 
     const result = await humanizeText(text, options);
     return NextResponse.json(result);
