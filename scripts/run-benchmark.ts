@@ -19,6 +19,11 @@ const presets = [
 
 const intensities = ["leggera", "media", "profonda"] as const;
 
+const models = (process.env.BENCHMARK_MODELS || "gemini-3.5-flash-lite,gemini-3.5-flash,gemini-3.8-flash")
+  .split(",")
+  .map((model) => model.trim())
+  .filter(Boolean);
+
 async function main() {
   if (!process.env.OPENAI_API_KEY) {
     throw new Error("OPENAI_API_KEY non configurata");
@@ -31,6 +36,7 @@ async function main() {
   for (const sample of selectedSamples) {
     for (const preset of presets) {
       for (const intensity of intensities) {
+        for (const model of models) {
         const options: HumanizeOptions = {
           mode: sample.category === "social" || sample.category === "civic" ? "social" : "natural",
           platform: sample.category === "social" || sample.category === "civic" ? "facebook" : undefined,
@@ -40,6 +46,7 @@ async function main() {
           emoji: false,
           cta: false,
           question: false,
+          model,
         };
 
         const rewritten = await humanizeText(sample.text, options);
@@ -51,6 +58,7 @@ async function main() {
           category: sample.category,
           preset,
           intensity,
+          model,
           original: sample.text,
           rewritten: rewritten.text,
           originalMetrics,
@@ -59,8 +67,9 @@ async function main() {
         });
 
         console.log(
-          `${sample.id} | ${preset} | ${intensity} | score ${results.at(-1)?.heuristicScore}`
+          `${sample.id} | ${preset} | ${intensity} | ${model} | score ${results.at(-1)?.heuristicScore}`
         );
+        }
       }
     }
   }
@@ -73,7 +82,7 @@ async function main() {
 
   const grouped = new Map<string, { total: number; count: number }>();
   for (const row of results) {
-    const key = `${row.preset}::${row.intensity}`;
+    const key = `${row.model}::${row.preset}::${row.intensity}`;
     const current = grouped.get(key) || { total: 0, count: 0 };
     current.total += row.heuristicScore;
     current.count += 1;
@@ -82,8 +91,9 @@ async function main() {
 
   const summary = [...grouped.entries()]
     .map(([key, value]) => {
-      const [preset, intensity] = key.split("::");
+      const [model, preset, intensity] = key.split("::");
       return {
+        model,
         preset,
         intensity,
         avgScore: Number((value.total / value.count).toFixed(2)),
