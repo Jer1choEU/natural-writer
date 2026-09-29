@@ -90,17 +90,6 @@ export default function Home() {
 
   return (
     <main className="shell">
-      <header className="hero">
-        <div>
-          <p className="eyebrow">NATURAL WRITER</p>
-          <h1>Scrivi come una persona, non come un modello.</h1>
-          <p className="subtitle">
-            Trasforma testi rigidi o impersonali in contenuti più naturali,
-            mantenendo intatto il significato.
-          </p>
-        </div>
-      </header>
-
       <section className="modeBar">
         {(Object.keys(modeLabels) as Mode[]).map((item) => (
           <button
