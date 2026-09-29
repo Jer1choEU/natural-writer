@@ -1,4 +1,3 @@
-import OpenAI from "openai";
 import { getPresetRules, type StylePreset } from "@/lib/style-presets";
 
 export type RewriteMode = "natural" | "professional" | "social";
@@ -14,7 +13,7 @@ export type HumanizeOptions = {
   preset?: StylePreset;
 };
 
-const model = process.env.OPENAI_MODEL || "gpt-6-astra";
+const model = process.env.GEMINI_MODEL || "gemini-3.5-flash-lite";
 
 const antiTicRules = [
   "Evita aperture generiche come 'nel mondo di oggi', 'in un contesto in continua evoluzione', 'è importante sottolineare'.",
@@ -150,44 +149,79 @@ function buildReviewInstructions(options: HumanizeOptions) {
   ].join(" ");
 }
 
+async function generateText(instructions: string, input: string) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error("GEMINI_API_KEY non configurata");
+  }
+
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        systemInstruction: {
+          parts: [{ text: instructions }],
+        },
+        contents: [
+          {
+            role: "user",
+            parts: [{ text: input }],
+          },
+        ],
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Gemini API error ${response.status}: ${errorText}`);
+  }
+
+  const data = await response.json();
+  const text =
+    data?.candidates?.[0]?.content?.parts
+      ?.map((part: { text?: string }) => part.text || "")
+      .join("")
+      .trim() || "";
+
+  if (!text) {
+    throw new Error("Gemini non ha restituito testo.");
+  }
+
+  return text;
+}
+
 export async function humanizeText(text: string, options: HumanizeOptions) {
-  const client = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-  });
+  const analysis = await generateText(buildAnalysisInstructions(options), text);
 
-  const analysis = await client.responses.create({
-    model,
-    instructions: buildAnalysisInstructions(options),
-    input: text,
-  });
-
-  const draft = await client.responses.create({
-    model,
-    instructions: buildRewriteInstructions(options),
-    input: [
+  const draft = await generateText(
+    buildRewriteInstructions(options),
+    [
       "TESTO ORIGINALE:",
       text,
       "",
       "PIANO EDITORIALE:",
-      analysis.output_text,
-    ].join("\n"),
-  });
+      analysis,
+    ].join("\n")
+  );
 
-  const finalPass = await client.responses.create({
-    model,
-    instructions: buildReviewInstructions(options),
-    input: [
+  const finalPass = await generateText(
+    buildReviewInstructions(options),
+    [
       "ORIGINALE:",
       text,
       "",
       "BOZZA:",
-      draft.output_text,
-    ].join("\n"),
-  });
+      draft,
+    ].join("\n")
+  );
 
   return {
-    text: finalPass.output_text.trim(),
+    text: finalPass.trim(),
     meta: {
+      provider: "gemini",
       model,
       stages: ["analysis", "rewrite", "faithfulness-review"],
       mode: options.mode,
