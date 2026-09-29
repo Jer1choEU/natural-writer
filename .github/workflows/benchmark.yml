@@ -8,9 +8,9 @@ on:
         required: false
         default: "2"
       model:
-        description: "Modello OpenAI"
+        description: "Modello Gemini"
         required: false
-        default: "gpt-6-astra"
+        default: "gemini-3.5-flash-lite"
   push:
     paths:
       - ".github/workflows/benchmark.yml"
@@ -37,8 +37,8 @@ jobs:
 
       - name: Run benchmark
         env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          OPENAI_MODEL: ${{ inputs.model || 'gpt-6-astra' }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: ${{ inputs.model || 'gemini-3.5-flash-lite' }}
           BENCHMARK_LIMIT: ${{ inputs.benchmark_limit || '2' }}
         run: npm run benchmark
 
