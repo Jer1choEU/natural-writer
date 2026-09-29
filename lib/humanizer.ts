@@ -11,9 +11,10 @@ export type HumanizeOptions = {
   cta?: boolean;
   question?: boolean;
   preset?: StylePreset;
+  model?: string;
 };
 
-const model = process.env.GEMINI_MODEL || "gemini-3.5-flash-lite";
+const defaultModel = process.env.GEMINI_MODEL || "gemini-3.5-flash-lite";
 
 const antiTicRules = [
   "Evita aperture generiche come 'nel mondo di oggi', 'in un contesto in continua evoluzione', 'è importante sottolineare'.",
@@ -149,14 +150,14 @@ function buildReviewInstructions(options: HumanizeOptions) {
   ].join(" ");
 }
 
-async function generateText(instructions: string, input: string) {
+async function generateText(instructions: string, input: string, selectedModel: string) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     throw new Error("GEMINI_API_KEY non configurata");
   }
 
   const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent?key=${encodeURIComponent(apiKey)}`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -194,7 +195,8 @@ async function generateText(instructions: string, input: string) {
 }
 
 export async function humanizeText(text: string, options: HumanizeOptions) {
-  const analysis = await generateText(buildAnalysisInstructions(options), text);
+  const selectedModel = options.model || defaultModel;
+  const analysis = await generateText(buildAnalysisInstructions(options), text, selectedModel);
 
   const draft = await generateText(
     buildRewriteInstructions(options),
@@ -204,7 +206,8 @@ export async function humanizeText(text: string, options: HumanizeOptions) {
       "",
       "PIANO EDITORIALE:",
       analysis,
-    ].join("\n")
+    ].join("\n"),
+    selectedModel
   );
 
   const finalPass = await generateText(
@@ -215,14 +218,15 @@ export async function humanizeText(text: string, options: HumanizeOptions) {
       "",
       "BOZZA:",
       draft,
-    ].join("\n")
+    ].join("\n"),
+    selectedModel
   );
 
   return {
     text: finalPass.trim(),
     meta: {
       provider: "gemini",
-      model,
+      model: selectedModel,
       stages: ["analysis", "rewrite", "faithfulness-review"],
       mode: options.mode,
       intensity: options.intensity || "media",
