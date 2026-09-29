@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { getPresetRules, type StylePreset } from "@/lib/style-presets";
 
 export type RewriteMode = "natural" | "professional" | "social";
 
@@ -10,6 +11,7 @@ export type HumanizeOptions = {
   emoji?: boolean;
   cta?: boolean;
   question?: boolean;
+  preset?: StylePreset;
 };
 
 const model = process.env.OPENAI_MODEL || "gpt-6-astra";
@@ -125,6 +127,7 @@ function buildRewriteInstructions(options: HumanizeOptions) {
     ...antiTicRules,
     intensityRules(options.intensity),
     modeRules(options),
+    getPresetRules(options.preset),
     `Tono richiesto: ${options.tone || "diretto"}.`,
     "Restituisci soltanto il testo riscritto, senza commenti, note, intestazioni o spiegazioni.",
   ].join(" ");
@@ -142,6 +145,7 @@ function buildReviewInstructions(options: HumanizeOptions) {
     "Mantieni la modalità e il tono richiesti.",
     intensityRules(options.intensity),
     modeRules(options),
+    getPresetRules(options.preset),
     "Restituisci esclusivamente la versione finale pronta all'uso.",
   ].join(" ");
 }
@@ -189,6 +193,7 @@ export async function humanizeText(text: string, options: HumanizeOptions) {
       mode: options.mode,
       intensity: options.intensity || "media",
       platform: options.mode === "social" ? options.platform || "instagram" : null,
+      preset: options.preset || "balanced",
     },
   };
 }
