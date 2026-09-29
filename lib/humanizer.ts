@@ -67,10 +67,11 @@ function intensityRules(intensity: HumanizeOptions["intensity"]) {
       return [
         "Migliora il testo senza inseguire la distanza dall'originale.",
         "La differenza lessicale non è un obiettivo: viene dopo precisione semantica, naturalezza, concretezza, voce dell'autore e fluidità.",
-        "Intervieni dove c'è un guadagno reale di chiarezza, ritmo o naturalezza; lascia intatte le formulazioni che funzionano già bene.",
-        "Puoi ristrutturare periodi, spezzare o unire frasi e cambiare l'ordine locale delle informazioni quando questo migliora davvero il testo.",
+        "Intervieni dove c'è un guadagno reale di chiarezza, ritmo o naturalezza; lascia intatte le ancore semantiche e le frasi forti che funzionano già bene.",
+        "Per intensità media, modifica però in modo visibile almeno parte della struttura sintattica circostante quando il testo lo consente: spezza o unisci periodi, cambia l'ordine locale delle informazioni, trasforma costruzioni passive o nominali in forme più dirette.",
+        "Evita che l'output sia una semplice copia con paragrafi diversi: deve esserci un miglioramento percepibile nella struttura o nel ritmo.",
         "Non sostituire parole o frasi solo per dimostrare che hai riscritto.",
-        "Se una frase dell'originale è più semplice, concreta o umana della variante proposta, conserva l'originale.",
+        "Se una frase dell'originale è più semplice, concreta o umana della variante proposta, conserva l'originale e lavora sul contesto intorno.",
         "Mantieni la voce, il livello di enfasi e la struttura logica dell'autore.",
       ].join(" ");
   }
@@ -128,6 +129,7 @@ function buildAnalysisInstructions(options: HumanizeOptions) {
     "Individua rigidità, ripetizioni, frasi troppo uniformi, transizioni meccaniche, formule generiche, tono impersonale e passaggi che sembrano costruiti più per essere ordinati che naturali.",
     "Segnala anche eventuali tic stilistici: simmetrie troppo perfette, enumerazioni artificiali, conclusioni automatiche, abuso di avverbi enfatici, nominalizzazioni, eccesso di due punti o trattini.",
     "Prima di proporre modifiche, individua le ancore semantiche e le frasi già forti, semplici e naturali che sarebbe meglio proteggere.",
+    "Distingui esplicitamente tra elementi da proteggere e parti su cui intervenire strutturalmente. Per intensità media, individua almeno uno o due punti in cui migliorare sintassi, ritmo o ordine delle informazioni senza cambiare il lessico chiave.",
     "Tratta come segnali d'allarme formule più editoriali o astratte dell'originale, come 'l'opera', 'la narrazione', 'il nodo centrale', 'si tratta di', 'è importante', 'lavoro cinematografico', quando il testo di partenza usa parole più semplici.",
     "Non giudicare se il testo sia stato scritto da una IA e non cercare di eludere sistemi di rilevazione.",
     `Modalità richiesta: ${options.mode}.`,
@@ -174,6 +176,7 @@ function buildReviewInstructions(options: HumanizeOptions) {
     "Se l'originale contiene un invito, un imperativo o una frase personale efficace, non trasformarlo in una raccomandazione impersonale.",
     "Controlla che il testo non sia diventato troppo levigato, simmetrico o prevedibile.",
     "Se due frasi consecutive hanno struttura o ritmo troppo simili, rendile più naturali senza introdurre nuove informazioni.",
+    "Verifica anche il problema opposto: se la bozza è quasi identica all'originale e ha cambiato solo spaziatura o punteggiatura, applica una o due modifiche strutturali reali nelle parti non protette, senza toccare le ancore semantiche.",
     "Rimuovi ridondanze residue e formule generiche.",
     "Mantieni la modalità e il tono richiesti.",
     intensityRules(options.intensity),
