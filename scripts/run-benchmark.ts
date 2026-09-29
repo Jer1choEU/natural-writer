@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { humanizeText, type HumanizeOptions } from "../lib/humanizer";
 import { BENCHMARK_SAMPLES } from "../benchmarks/samples";
-import { analyzeText, heuristicScore } from "../benchmarks/scoring";
+import { analyzeText, heuristicScore, rewriteSimilarity } from "../benchmarks/scoring";
 import { judgeRewrite } from "../benchmarks/quality-judge";
 
 const allPresets = [
@@ -88,12 +88,13 @@ async function main() {
             originalMetrics,
             rewrittenMetrics,
             heuristicScore: heuristicScore(originalMetrics, rewrittenMetrics),
+            rewriteSimilarity: rewriteSimilarity(sample.text, rewritten.text),
             qualityJudge,
             status: "ok",
           });
 
           console.log(
-            `${sample.id} | ${preset} | ${intensity} | ${model} | heuristic ${results.at(-1)?.heuristicScore} | quality ${qualityJudge?.overall ?? "n/a"}`
+            `${sample.id} | ${preset} | ${intensity} | ${model} | heuristic ${results.at(-1)?.heuristicScore} | similarity ${results.at(-1)?.rewriteSimilarity} | quality ${qualityJudge?.overall ?? "n/a"}`
           );
         } catch (error) {
           console.error(`${sample.id} | ${preset} | ${intensity} | ${model} | FAILED`);
@@ -124,13 +125,17 @@ async function main() {
   const jsonPath = path.join(outDir, "latest.json");
   await fs.writeFile(jsonPath, JSON.stringify(results, null, 2));
 
-  const grouped = new Map<string, { total: number; count: number; qualityTotal: number; qualityCount: number }>();
+  const grouped = new Map<string, { total: number; count: number; qualityTotal: number; qualityCount: number; similarityTotal: number; similarityCount: number }>();
   for (const row of results) {
     if (row.status !== "ok" || row.heuristicScore == null) continue;
     const key = `${row.model}::${row.preset}::${row.intensity}`;
-    const current = grouped.get(key) || { total: 0, count: 0, qualityTotal: 0, qualityCount: 0 };
+    const current = grouped.get(key) || { total: 0, count: 0, qualityTotal: 0, qualityCount: 0, similarityTotal: 0, similarityCount: 0 };
     current.total += row.heuristicScore;
     current.count += 1;
+    if (row.rewriteSimilarity != null) {
+      current.similarityTotal += row.rewriteSimilarity;
+      current.similarityCount += 1;
+    }
     if (row.qualityJudge?.overall != null) {
       current.qualityTotal += row.qualityJudge.overall;
       current.qualityCount += 1;
@@ -149,6 +154,10 @@ async function main() {
         avgQualityScore:
           value.qualityCount > 0
             ? Number((value.qualityTotal / value.qualityCount).toFixed(2))
+            : null,
+        avgRewriteSimilarity:
+          value.similarityCount > 0
+            ? Number((value.similarityTotal / value.similarityCount).toFixed(3))
             : null,
         samples: value.count,
       };
