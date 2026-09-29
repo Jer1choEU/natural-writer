@@ -106,8 +106,8 @@ function socialRules(options: HumanizeOptions) {
   };
 
   return [
-    `Piattaforma: ${options.platform || "instagram"}.`,
-    platformRules[options.platform || "instagram"],
+    options.platform ? `Piattaforma: ${options.platform}.` : "Destinazione: social media, senza adattamento a una piattaforma specifica.",
+    options.platform ? platformRules[options.platform] : "Privilegia leggibilità mobile, paragrafi brevi, ritmo naturale e una formulazione diretta, senza hook artificiosi o stile da piattaforma specifica.",
     `Emoji: ${options.emoji ? "consentite, ma solo se aggiungono qualcosa e senza sequenze decorative" : "non usarle"}.`,
     `Call to action: ${options.cta ? "presente, breve e coerente col contenuto" : "non aggiungerla automaticamente"}.`,
     `Domanda finale: ${options.question ? "può esserci, ma solo se nasce davvero dal testo" : "non aggiungerla"}.`,
@@ -263,7 +263,7 @@ export async function humanizeText(text: string, options: HumanizeOptions) {
       stages: ["analysis", "rewrite", "faithfulness-review"],
       mode: options.mode,
       intensity: options.intensity || "media",
-      platform: options.mode === "social" ? options.platform || "instagram" : null,
+      platform: options.mode === "social" ? options.platform || null : null,
       preset: options.preset || "balanced",
     },
   };
