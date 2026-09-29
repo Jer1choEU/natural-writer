@@ -26,6 +26,11 @@ export const BENCHMARK_SAMPLES: BenchmarkSample[] = [
     text: "Questo progetto nasce con un obiettivo semplice: rendere più facile trasformare testi rigidi in contenuti più naturali. Vogliamo costruire uno strumento utile per chi scrive post, comunicazioni, articoli brevi e contenuti professionali.",
   },
   {
+    id: "social-3-concrete-language",
+    category: "social",
+    text: "🎬 NAZA è in sala in questi giorni.\n\nIl documentario mostra la guerra a Gaza dall'interno, attraverso i racconti di soldati e ufficiali dell'intelligence israeliana. Mette a fuoco la disumanizzazione dei civili e quel linguaggio che riduce le persone a meri “danni collaterali”.\n\nSi parla di ordini, tecnologia, sorveglianza e responsabilità dei singoli. Ma il punto chiave è un altro: cosa succede quando, dietro sigle e numeri, smettiamo di vedere gli esseri umani?\n\nÈ un film duro, necessario, che resta addosso. Andiamo a vederlo e parliamone, perché, di fronte a certe testimonianze, sapere vuol dire anche scegliere di non voltarsi dall'altra parte.",
+  },
+  {
     id: "professional-1",
     category: "professional",
     text: "A seguito dell'analisi effettuata, si ritiene opportuno procedere con una revisione del processo attualmente in uso, al fine di ridurre i tempi di gestione e migliorare la chiarezza delle responsabilità tra i diversi soggetti coinvolti.",
