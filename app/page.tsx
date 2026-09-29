@@ -25,18 +25,52 @@ export default function Home() {
   const [mode, setMode] = useState<Mode>("natural");
   const [platform, setPlatform] = useState<Platform>("instagram");
   const [tone, setTone] = useState("diretto");
-  const [intensity, setIntensity] = useState("media");
+  const [intensity, setIntensity] = useState<"leggera" | "media" | "profonda">("media");
   const [emoji, setEmoji] = useState(true);
   const [cta, setCta] = useState(false);
   const [question, setQuestion] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  const canTransform = useMemo(() => input.trim().length > 0, [input]);
+  const canTransform = useMemo(
+    () => input.trim().length > 0 && !loading,
+    [input, loading]
+  );
 
-  function transform() {
+  async function transform() {
     if (!canTransform) return;
-    setOutput(
-      "Il motore di riscrittura verrà collegato qui. L'interfaccia è già pronta per inviare testo, modalità e preferenze all'API."
-    );
+
+    setLoading(true);
+    setError("");
+
+    try {
+      const response = await fetch("/api/rewrite", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text: input,
+          mode,
+          platform,
+          tone,
+          intensity,
+          emoji,
+          cta,
+          question,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Errore durante la trasformazione.");
+      }
+
+      setOutput(data.text);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Errore imprevisto.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -80,7 +114,12 @@ export default function Home() {
         <aside className="controls">
           <label>
             Intensità
-            <select value={intensity} onChange={(e) => setIntensity(e.target.value)}>
+            <select
+              value={intensity}
+              onChange={(e) =>
+                setIntensity(e.target.value as "leggera" | "media" | "profonda")
+              }
+            >
               <option value="leggera">Leggera</option>
               <option value="media">Media</option>
               <option value="profonda">Profonda</option>
@@ -115,11 +154,19 @@ export default function Home() {
               </label>
 
               <label className="toggle">
-                <input type="checkbox" checked={emoji} onChange={(e) => setEmoji(e.target.checked)} />
+                <input
+                  type="checkbox"
+                  checked={emoji}
+                  onChange={(e) => setEmoji(e.target.checked)}
+                />
                 Emoji
               </label>
               <label className="toggle">
-                <input type="checkbox" checked={cta} onChange={(e) => setCta(e.target.checked)} />
+                <input
+                  type="checkbox"
+                  checked={cta}
+                  onChange={(e) => setCta(e.target.checked)}
+                />
                 Call to action
               </label>
               <label className="toggle">
@@ -134,8 +181,10 @@ export default function Home() {
           )}
 
           <button className="primary" disabled={!canTransform} onClick={transform}>
-            Trasforma
+            {loading ? "Sto riscrivendo..." : "Trasforma"}
           </button>
+
+          {error && <p className="error">{error}</p>}
         </aside>
 
         <div className="panel">
