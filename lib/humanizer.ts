@@ -156,42 +156,56 @@ async function generateText(instructions: string, input: string, selectedModel: 
     throw new Error("GEMINI_API_KEY non configurata");
   }
 
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent?key=${encodeURIComponent(apiKey)}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        systemInstruction: {
-          parts: [{ text: instructions }],
-        },
-        contents: [
-          {
-            role: "user",
-            parts: [{ text: input }],
+  const maxAttempts = 4;
+  let lastError: Error | null = null;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent?key=${encodeURIComponent(apiKey)}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          systemInstruction: {
+            parts: [{ text: instructions }],
           },
-        ],
-      }),
+          contents: [
+            {
+              role: "user",
+              parts: [{ text: input }],
+            },
+          ],
+        }),
+      }
+    );
+
+    if (response.ok) {
+      const data = await response.json();
+      const text =
+        data?.candidates?.[0]?.content?.parts
+          ?.map((part: { text?: string }) => part.text || "")
+          .join("")
+          .trim() || "";
+
+      if (!text) {
+        throw new Error("Gemini non ha restituito testo.");
+      }
+
+      return text;
     }
-  );
 
-  if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`Gemini API error ${response.status}: ${errorText}`);
+    lastError = new Error(`Gemini API error ${response.status}: ${errorText}`);
+
+    if (![429, 500, 502, 503, 504].includes(response.status) || attempt === maxAttempts) {
+      throw lastError;
+    }
+
+    const delayMs = 1000 * 2 ** (attempt - 1);
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
   }
 
-  const data = await response.json();
-  const text =
-    data?.candidates?.[0]?.content?.parts
-      ?.map((part: { text?: string }) => part.text || "")
-      .join("")
-      .trim() || "";
-
-  if (!text) {
-    throw new Error("Gemini non ha restituito testo.");
-  }
-
-  return text;
+  throw lastError || new Error("Gemini API error sconosciuto");
 }
 
 export async function humanizeText(text: string, options: HumanizeOptions) {
