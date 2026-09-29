@@ -3,6 +3,8 @@ export type QualityJudgeResult = {
   naturalness: number;
   rhythm: number;
   specificity: number;
+  semanticPrecision: number;
+  concreteness: number;
   antiTics: number;
   overall: number;
   notes: string[];
@@ -73,6 +75,8 @@ Assegna un punteggio da 0 a 10 per:
 - naturalness: suona come prosa umana naturale, non rigida o meccanica;
 - rhythm: varietà credibile di lunghezza e struttura delle frasi;
 - specificity: evita genericità e formulazioni vuote senza inventare dettagli;
+- semanticPrecision: conserva esattamente i concetti dell'originale e non usa sinonimi che ne spostano il significato;
+- concreteness: mantiene o migliora la concretezza senza rendere il testo più astratto, solenne o letterario dell'originale;
 - antiTics: evita simmetrie artificiali, conclusioni automatiche, slogan, terne decorative, enfasi superflua e formule stereotipate.
 
 overall deve riflettere il giudizio complessivo, con fidelity come requisito più importante.
@@ -85,6 +89,8 @@ Restituisci SOLO JSON valido con questa forma:
   "naturalness": 0,
   "rhythm": 0,
   "specificity": 0,
+  "semanticPrecision": 0,
+  "concreteness": 0,
   "antiTics": 0,
   "overall": 0,
   "notes": ["massimo 3 osservazioni brevi"]
@@ -102,6 +108,8 @@ ${rewritten}
     naturalness: clampScore(raw.naturalness),
     rhythm: clampScore(raw.rhythm),
     specificity: clampScore(raw.specificity),
+    semanticPrecision: clampScore(raw.semanticPrecision),
+    concreteness: clampScore(raw.concreteness),
     antiTics: clampScore(raw.antiTics),
     overall: clampScore(raw.overall),
     notes: Array.isArray(raw.notes) ? raw.notes.slice(0, 3).map(String) : [],
