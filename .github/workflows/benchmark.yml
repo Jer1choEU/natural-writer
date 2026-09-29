@@ -39,7 +39,9 @@ jobs:
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           BENCHMARK_MODELS: ${{ inputs.models || 'gemini-3.5-flash-lite,gemini-3.5-flash,gemini-3.8-flash' }}
-          BENCHMARK_LIMIT: ${{ inputs.benchmark_limit || '2' }}
+          BENCHMARK_LIMIT: ${{ inputs.benchmark_limit || '1' }}
+          BENCHMARK_PRESETS: balanced,social-direct,journalistic
+          BENCHMARK_INTENSITIES: media
         run: npm run benchmark
 
       - name: Upload benchmark results
