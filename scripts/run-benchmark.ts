@@ -4,7 +4,7 @@ import { humanizeText, type HumanizeOptions } from "../lib/humanizer";
 import { BENCHMARK_SAMPLES } from "../benchmarks/samples";
 import { analyzeText, heuristicScore } from "../benchmarks/scoring";
 
-const presets = [
+const allPresets = [
   "balanced",
   "editorial",
   "social-direct",
@@ -17,7 +17,21 @@ const presets = [
   "civic",
 ] as const;
 
-const intensities = ["leggera", "media", "profonda"] as const;
+const allIntensities = ["leggera", "media", "profonda"] as const;
+
+const presets = (process.env.BENCHMARK_PRESETS || "balanced,social-direct,journalistic")
+  .split(",")
+  .map((value) => value.trim())
+  .filter((value): value is (typeof allPresets)[number] =>
+    allPresets.includes(value as (typeof allPresets)[number])
+  );
+
+const intensities = (process.env.BENCHMARK_INTENSITIES || "media")
+  .split(",")
+  .map((value) => value.trim())
+  .filter((value): value is (typeof allIntensities)[number] =>
+    allIntensities.includes(value as (typeof allIntensities)[number])
+  );
 
 const models = (process.env.BENCHMARK_MODELS || "gemini-3.5-flash-lite,gemini-3.5-flash,gemini-3.8-flash")
   .split(",")
@@ -25,11 +39,11 @@ const models = (process.env.BENCHMARK_MODELS || "gemini-3.5-flash-lite,gemini-3.
   .filter(Boolean);
 
 async function main() {
-  if (!process.env.OPENAI_API_KEY) {
-    throw new Error("OPENAI_API_KEY non configurata");
+  if (!process.env.GEMINI_API_KEY) {
+    throw new Error("GEMINI_API_KEY non configurata");
   }
 
-  const limit = Number(process.env.BENCHMARK_LIMIT || "10");
+  const limit = Number(process.env.BENCHMARK_LIMIT || "1");
   const selectedSamples = BENCHMARK_SAMPLES.slice(0, limit);
   const results = [];
 
