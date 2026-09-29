@@ -58,7 +58,7 @@ L'ultimo passaggio confronta originale e bozza per ridurre alterazioni di signif
 - Next.js
 - TypeScript
 - React
-- OpenAI Responses API
+- Gemini Developer API
 - provider e modello configurabili via variabili d'ambiente
 
 ## Configurazione
@@ -66,8 +66,8 @@ L'ultimo passaggio confronta originale e bozza per ridurre alterazioni di signif
 Copia `.env.example` in `.env.local` e imposta:
 
 ```bash
-OPENAI_API_KEY=...
-OPENAI_MODEL=gpt-6-astra
+GEMINI_API_KEY=...
+GEMINI_MODEL=gemini-3.5-flash-lite
 ```
 
 La chiave viene letta solo lato server.
@@ -83,7 +83,7 @@ Poi apri `http://localhost:3000`.
 
 ## Stato
 
-🚧 MVP funzionante lato codice. Serve configurare `OPENAI_API_KEY` nell'ambiente di deploy per effettuare trasformazioni reali.
+🚧 MVP funzionante lato codice. Serve configurare `GEMINI_API_KEY` nell'ambiente di deploy per effettuare trasformazioni reali.
 
 
 ## Regole qualitative
@@ -173,13 +173,20 @@ Il punteggio euristico serve soltanto come segnale tecnico: non sostituisce una 
 Prima dell'esecuzione aggiungi nella repository il secret:
 
 ```
-OPENAI_API_KEY
+GEMINI_API_KEY
 ```
 
 Poi vai in **Actions → Benchmark Natural Writer → Run workflow**.
 
 Puoi scegliere:
 - `benchmark_limit`: numero di testi campione;
-- `model`: modello OpenAI da usare.
+- `model`: modello Gemini da usare.
 
 Il workflow esegue typecheck, benchmark e carica i risultati come artifact per 14 giorni.
+
+
+## Provider predefinito
+
+Natural Writer usa **Gemini 3.5 Flash-Lite** come modello predefinito per l'MVP, così il progetto può partire usando il free tier della Gemini Developer API.
+
+Il provider è isolato dal resto del motore, quindi in futuro sarà possibile aggiungere OpenAI, OpenRouter, Mistral o altri backend senza riscrivere l'interfaccia.
