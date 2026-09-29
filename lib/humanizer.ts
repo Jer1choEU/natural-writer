@@ -40,6 +40,12 @@ const antiTicRules = [
   "Non introdurre riferimenti vaghi come 'queste immagini', 'questa realtà', 'questo scenario' se l'originale non li contiene.",
   "Se una frase breve funziona meglio, usala.",
   "Non rendere il testo artificialmente elegante o perfettamente bilanciato.",
+  "Mantieni un tetto di sofisticazione lessicale: la riscrittura non deve usare parole più ricercate o astratte dell'originale senza una ragione precisa.",
+  "Se l'originale usa un termine concettualmente preciso, non sostituirlo con un sinonimo solo apparentemente equivalente: responsabilità non è scelte individuali, disumanizzazione non è spoliazione di umanità.",
+  "Evita nominalizzazioni che raffreddano una frase concreta: preferisci formule come 'smettiamo di vedere le persone' a costruzioni come 'perdita della capacità di riconoscere gli esseri umani' quando il significato è lo stesso.",
+  "Non sostituire parole quotidiane con varianti più solenni senza beneficio: per esempio film non deve diventare opera, sapere non deve diventare conoscere, resta addosso non deve diventare lascia il segno solo per variare.",
+  "Considera alcune parole o espressioni dell'originale come ancore semantiche: se sono centrali, naturali e precise, puoi lasciarle identiche anche in una riscrittura sostanziale.",
+  "Preserva emoji, simboli e piccoli elementi espressivi dell'originale quando sono coerenti con il contesto; non rimuoverli automaticamente.",
 ];
 
 function intensityRules(intensity: HumanizeOptions["intensity"]) {
@@ -160,6 +166,9 @@ function buildReviewInstructions(options: HumanizeOptions) {
     "Controlla che la bozza non abbia reso più astratto, solenne o editoriale un passaggio che nell'originale era semplice e diretto.",
     "Se una parola o espressione originale è già naturale ed efficace, mantienila quando sostituirla produrrebbe solo un sinonimo più artificiale.",
     "Verifica che ogni sostituzione lessicale conservi esattamente il concetto, non soltanto un significato vicino.",
+    "Controlla esplicitamente che la bozza non abbia alzato il registro rispetto all'originale: se è diventata più astratta, solenne o letteraria, riportala a una formulazione semplice e concreta.",
+    "Individua le ancore semantiche dell'originale, cioè termini o frasi particolarmente precisi e naturali, e ripristinale quando la bozza le ha sostituite con equivalenti meno precisi.",
+    "Controlla che emoji, simboli e altri elementi espressivi presenti nell'originale non siano stati eliminati senza motivo.",
     "Se l'originale contiene un invito, un imperativo o una frase personale efficace, non trasformarlo in una raccomandazione impersonale.",
     "Controlla che il testo non sia diventato troppo levigato, simmetrico o prevedibile.",
     "Se due frasi consecutive hanno struttura o ritmo troppo simili, rendile più naturali senza introdurre nuove informazioni.",
