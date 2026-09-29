@@ -63,26 +63,46 @@ async function main() {
           model,
         };
 
-        const rewritten = await humanizeText(sample.text, options);
-        const originalMetrics = analyzeText(sample.text);
-        const rewrittenMetrics = analyzeText(rewritten.text);
+        try {
+          const rewritten = await humanizeText(sample.text, options);
+          const originalMetrics = analyzeText(sample.text);
+          const rewrittenMetrics = analyzeText(rewritten.text);
 
-        results.push({
-          sampleId: sample.id,
-          category: sample.category,
-          preset,
-          intensity,
-          model,
-          original: sample.text,
-          rewritten: rewritten.text,
-          originalMetrics,
-          rewrittenMetrics,
-          heuristicScore: heuristicScore(originalMetrics, rewrittenMetrics),
-        });
+          results.push({
+            sampleId: sample.id,
+            category: sample.category,
+            preset,
+            intensity,
+            model,
+            original: sample.text,
+            rewritten: rewritten.text,
+            originalMetrics,
+            rewrittenMetrics,
+            heuristicScore: heuristicScore(originalMetrics, rewrittenMetrics),
+            status: "ok",
+          });
 
-        console.log(
-          `${sample.id} | ${preset} | ${intensity} | ${model} | score ${results.at(-1)?.heuristicScore}`
-        );
+          console.log(
+            `${sample.id} | ${preset} | ${intensity} | ${model} | score ${results.at(-1)?.heuristicScore}`
+          );
+        } catch (error) {
+          console.error(`${sample.id} | ${preset} | ${intensity} | ${model} | FAILED`);
+          console.error(error);
+          results.push({
+            sampleId: sample.id,
+            category: sample.category,
+            preset,
+            intensity,
+            model,
+            original: sample.text,
+            rewritten: null,
+            originalMetrics: analyzeText(sample.text),
+            rewrittenMetrics: null,
+            heuristicScore: null,
+            status: "failed",
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
         }
       }
     }
@@ -96,6 +116,7 @@ async function main() {
 
   const grouped = new Map<string, { total: number; count: number }>();
   for (const row of results) {
+    if (row.status !== "ok" || row.heuristicScore == null) continue;
     const key = `${row.model}::${row.preset}::${row.intensity}`;
     const current = grouped.get(key) || { total: 0, count: 0 };
     current.total += row.heuristicScore;
