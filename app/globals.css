@@ -198,3 +198,10 @@ footer {
     min-height: 360px;
   }
 }
+
+.error {
+  margin: 0;
+  color: #ff8f8f;
+  font-size: .82rem;
+  line-height: 1.4;
+}
