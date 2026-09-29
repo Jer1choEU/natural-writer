@@ -1,0 +1,50 @@
+name: Benchmark Natural Writer
+
+on:
+  workflow_dispatch:
+    inputs:
+      benchmark_limit:
+        description: "Numero di testi campione da eseguire"
+        required: false
+        default: "2"
+      model:
+        description: "Modello OpenAI"
+        required: false
+        default: "gpt-6-astra"
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Run benchmark
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: ${{ inputs.model }}
+          BENCHMARK_LIMIT: ${{ inputs.benchmark_limit }}
+        run: npm run benchmark
+
+      - name: Upload benchmark results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: natural-writer-benchmark
+          path: benchmark-results/
+          if-no-files-found: warn
+          retention-days: 14
