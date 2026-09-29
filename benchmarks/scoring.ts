@@ -86,3 +86,34 @@ export function heuristicScore(original: TextMetrics, rewritten: TextMetrics) {
 
   return Math.max(0, score);
 }
+
+
+function wordBigrams(text: string) {
+  const tokens = text
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .split(/\s+/)
+    .filter(Boolean);
+
+  const bigrams = new Set<string>();
+  for (let i = 0; i < tokens.length - 1; i++) {
+    bigrams.add(`${tokens[i]} ${tokens[i + 1]}`);
+  }
+  return bigrams;
+}
+
+export function rewriteSimilarity(original: string, rewritten: string) {
+  const a = wordBigrams(original);
+  const b = wordBigrams(rewritten);
+
+  if (a.size === 0 && b.size === 0) return 1;
+  if (a.size === 0 || b.size === 0) return 0;
+
+  let intersection = 0;
+  for (const item of a) {
+    if (b.has(item)) intersection += 1;
+  }
+
+  const union = new Set([...a, ...b]).size;
+  return Number((intersection / union).toFixed(3));
+}
