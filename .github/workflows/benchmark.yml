@@ -35,6 +35,11 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      - name: Build
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: npm run build
+
       - name: Run benchmark
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
