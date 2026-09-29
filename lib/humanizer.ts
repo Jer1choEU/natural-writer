@@ -12,10 +12,6 @@ export type HumanizeOptions = {
   question?: boolean;
 };
 
-const client = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-
 const model = process.env.OPENAI_MODEL || "gpt-6-astra";
 
 function socialRules(options: HumanizeOptions) {
@@ -31,6 +27,10 @@ function socialRules(options: HumanizeOptions) {
 }
 
 export async function humanizeText(text: string, options: HumanizeOptions) {
+  const client = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+  });
+
   const analysis = await client.responses.create({
     model,
     instructions: [
