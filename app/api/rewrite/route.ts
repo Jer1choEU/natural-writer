@@ -10,9 +10,9 @@ const allowedPresets = new Set(["balanced", "editorial", "social-direct", "linke
 
 export async function POST(request: Request) {
   try {
-    if (!process.env.OPENAI_API_KEY) {
+    if (!process.env.GEMINI_API_KEY) {
       return NextResponse.json(
-        { error: "OPENAI_API_KEY non configurata sul server." },
+        { error: "GEMINI_API_KEY non configurata sul server." },
         { status: 500 }
       );
     }
