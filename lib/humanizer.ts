@@ -1,4 +1,5 @@
 import { getPresetRules, type StylePreset } from "@/lib/style-presets";
+import { getM5SStyleRules } from "@/lib/m5s-style";
 
 export type RewriteMode = "natural" | "professional" | "social";
 
@@ -124,6 +125,7 @@ function buildAnalysisInstructions(options: HumanizeOptions) {
     "Non giudicare se il testo sia stato scritto da una IA e non cercare di eludere sistemi di rilevazione.",
     `Modalità richiesta: ${options.mode}.`,
     `Intensità: ${options.intensity || "media"}.`,
+    getM5SStyleRules(),
     "Restituisci un piano di riscrittura molto conciso, massimo 8 punti, senza riscrivere ancora il testo.",
   ].join(" ");
 }
@@ -141,6 +143,7 @@ function buildRewriteInstructions(options: HumanizeOptions) {
     intensityRules(options.intensity),
     modeRules(options),
     getPresetRules(options.preset),
+    getM5SStyleRules(),
     `Tono richiesto: ${options.tone || "diretto"}.`,
     "Restituisci soltanto il testo riscritto, senza commenti, note, intestazioni o spiegazioni.",
   ].join(" ");
@@ -165,6 +168,7 @@ function buildReviewInstructions(options: HumanizeOptions) {
     intensityRules(options.intensity),
     modeRules(options),
     getPresetRules(options.preset),
+    getM5SStyleRules(),
     "Restituisci esclusivamente la versione finale pronta all'uso.",
   ].join(" ");
 }
