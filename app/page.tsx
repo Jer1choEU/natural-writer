@@ -11,6 +11,19 @@ const modeLabels: Record<Mode, string> = {
   social: "Social post",
 };
 
+const stylePresets = [
+  ["balanced", "Naturale equilibrato"],
+  ["editorial", "Editoriale autorevole"],
+  ["social-direct", "Social diretto"],
+  ["linkedin-personal", "LinkedIn personale"],
+  ["journalistic", "Giornalistico asciutto"],
+  ["political-comment", "Commento politico incisivo"],
+  ["storytelling", "Storytelling personale"],
+  ["minimal", "Minimalista"],
+  ["explainer", "Divulgazione chiara"],
+  ["civic", "Post civico / attivismo"],
+] as const;
+
 const platforms: { value: Platform; label: string }[] = [
   { value: "instagram", label: "Instagram" },
   { value: "facebook", label: "Facebook" },
@@ -25,6 +38,7 @@ export default function Home() {
   const [mode, setMode] = useState<Mode>("natural");
   const [platform, setPlatform] = useState<Platform>("instagram");
   const [tone, setTone] = useState("diretto");
+  const [preset, setPreset] = useState("balanced");
   const [intensity, setIntensity] = useState<"leggera" | "media" | "profonda">("media");
   const [emoji, setEmoji] = useState(true);
   const [cta, setCta] = useState(false);
@@ -52,6 +66,7 @@ export default function Home() {
           mode,
           platform,
           tone,
+          preset,
           intensity,
           emoji,
           cta,
@@ -112,6 +127,15 @@ export default function Home() {
         </div>
 
         <aside className="controls">
+          <label>
+            Stile
+            <select value={preset} onChange={(e) => setPreset(e.target.value)}>
+              {stylePresets.map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
+            </select>
+          </label>
+
           <label>
             Intensità
             <select
