@@ -51,8 +51,12 @@ function intensityRules(intensity: HumanizeOptions["intensity"]) {
       ].join(" ");
     default:
       return [
-        "Riscrivi con libertà moderata.",
-        "Mantieni riconoscibile la struttura logica originale, ma migliora ritmo e naturalezza.",
+        "Esegui una vera riscrittura, non una semplice revisione stilistica.",
+        "Il risultato deve essere chiaramente diverso nella formulazione dall'originale pur mantenendo identici fatti, tesi e significato.",
+        "Riformula una parte sostanziale delle frasi, cambia costruzioni sintattiche e lessico quando esistono alternative naturali.",
+        "Puoi modificare l'ordine locale delle informazioni e la divisione dei periodi quando migliora il testo.",
+        "Non lasciare intere sequenze di frasi quasi identiche all'originale solo perché sono già corrette.",
+        "Mantieni però la voce, il livello di enfasi e la struttura logica dell'autore.",
       ].join(" ");
   }
 }
@@ -139,6 +143,8 @@ function buildReviewInstructions(options: HumanizeOptions) {
     "Confronta originale e bozza frase per frase sul piano del significato.",
     "Ripristina qualunque fatto, numero, nome, citazione, sfumatura o rapporto causale alterato.",
     "Rimuovi qualsiasi aggiunta non supportata dall'originale.",
+    "Non riportare la bozza verso le formulazioni dell'originale se il significato è già fedele.",
+    "La fedeltà riguarda contenuto e tono, non la conservazione delle stesse parole o della stessa sintassi.",
     "Controlla che il testo non sia diventato troppo levigato, simmetrico o prevedibile.",
     "Se due frasi consecutive hanno struttura o ritmo troppo simili, rendile più naturali senza introdurre nuove informazioni.",
     "Rimuovi ridondanze residue e formule generiche.",
