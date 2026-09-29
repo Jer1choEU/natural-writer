@@ -65,14 +65,13 @@ function intensityRules(intensity: HumanizeOptions["intensity"]) {
       ].join(" ");
     default:
       return [
-        "Esegui una vera riscrittura, non una semplice revisione stilistica.",
-        "Il risultato deve essere chiaramente diverso nella formulazione dall'originale pur mantenendo identici fatti, tesi e significato.",
-        "Riformula una parte sostanziale delle frasi, cambia costruzioni sintattiche e lessico quando esistono alternative naturali.",
-        "Le alternative devono restare semplici e credibili: non rendere il lessico più ricercato dell'originale senza motivo.",
-        "Non cambiare parole efficaci solo per rendere il testo più diverso: privilegia ristrutturazione, ritmo e sintassi.",
-        "Puoi modificare l'ordine locale delle informazioni e la divisione dei periodi quando migliora il testo.",
-        "Non lasciare intere sequenze di frasi quasi identiche all'originale solo perché sono già corrette.",
-        "Mantieni però la voce, il livello di enfasi e la struttura logica dell'autore.",
+        "Migliora il testo senza inseguire la distanza dall'originale.",
+        "La differenza lessicale non è un obiettivo: viene dopo precisione semantica, naturalezza, concretezza, voce dell'autore e fluidità.",
+        "Intervieni dove c'è un guadagno reale di chiarezza, ritmo o naturalezza; lascia intatte le formulazioni che funzionano già bene.",
+        "Puoi ristrutturare periodi, spezzare o unire frasi e cambiare l'ordine locale delle informazioni quando questo migliora davvero il testo.",
+        "Non sostituire parole o frasi solo per dimostrare che hai riscritto.",
+        "Se una frase dell'originale è più semplice, concreta o umana della variante proposta, conserva l'originale.",
+        "Mantieni la voce, il livello di enfasi e la struttura logica dell'autore.",
       ].join(" ");
   }
 }
@@ -115,7 +114,7 @@ function socialRules(options: HumanizeOptions) {
   return [
     options.platform ? `Piattaforma: ${options.platform}.` : "Destinazione: social media, senza adattamento a una piattaforma specifica.",
     options.platform ? platformRules[options.platform] : "Privilegia leggibilità mobile, paragrafi brevi, ritmo naturale e una formulazione diretta, senza hook artificiosi o stile da piattaforma specifica.",
-    `Emoji: ${options.emoji ? "consentite, ma solo se aggiungono qualcosa e senza sequenze decorative" : "non usarle"}.`,
+    `Emoji: ${options.emoji ? "puoi mantenerle e, solo se davvero utili, aggiungerne con moderazione" : "non aggiungerne di nuove; conserva però quelle già presenti nell'originale se coerenti"}.`,
     `Call to action: ${options.cta ? "presente, breve e coerente col contenuto" : "non aggiungerla automaticamente"}.`,
     `Domanda finale: ${options.question ? "può esserci, ma solo se nasce davvero dal testo" : "non aggiungerla"}.`,
     "Evita hook artificiosi, frasi motivazionali prefabbricate e chiusure da engagement bait.",
@@ -128,6 +127,8 @@ function buildAnalysisInstructions(options: HumanizeOptions) {
     "Analizza il testo come un editor umano esperto.",
     "Individua rigidità, ripetizioni, frasi troppo uniformi, transizioni meccaniche, formule generiche, tono impersonale e passaggi che sembrano costruiti più per essere ordinati che naturali.",
     "Segnala anche eventuali tic stilistici: simmetrie troppo perfette, enumerazioni artificiali, conclusioni automatiche, abuso di avverbi enfatici, nominalizzazioni, eccesso di due punti o trattini.",
+    "Prima di proporre modifiche, individua le ancore semantiche e le frasi già forti, semplici e naturali che sarebbe meglio proteggere.",
+    "Tratta come segnali d'allarme formule più editoriali o astratte dell'originale, come 'l'opera', 'la narrazione', 'il nodo centrale', 'si tratta di', 'è importante', 'lavoro cinematografico', quando il testo di partenza usa parole più semplici.",
     "Non giudicare se il testo sia stato scritto da una IA e non cercare di eludere sistemi di rilevazione.",
     `Modalità richiesta: ${options.mode}.`,
     `Intensità: ${options.intensity || "media"}.`,
@@ -161,14 +162,15 @@ function buildReviewInstructions(options: HumanizeOptions) {
     "Confronta originale e bozza frase per frase sul piano del significato.",
     "Ripristina qualunque fatto, numero, nome, citazione, sfumatura o rapporto causale alterato.",
     "Rimuovi qualsiasi aggiunta non supportata dall'originale.",
-    "Non riportare la bozza verso le formulazioni dell'originale se il significato è già fedele.",
-    "La fedeltà riguarda contenuto e tono, non la conservazione delle stesse parole o della stessa sintassi.",
+    "Non preservare una formulazione della bozza solo perché è diversa: se l'originale era più naturale, concreta o precisa, ripristinalo senza esitazioni.",
+    "La fedeltà riguarda contenuto, tono e precisione concettuale; la conservazione delle stesse parole è perfettamente accettabile quando quelle parole sono già le migliori.",
     "Controlla che la bozza non abbia reso più astratto, solenne o editoriale un passaggio che nell'originale era semplice e diretto.",
     "Se una parola o espressione originale è già naturale ed efficace, mantienila quando sostituirla produrrebbe solo un sinonimo più artificiale.",
     "Verifica che ogni sostituzione lessicale conservi esattamente il concetto, non soltanto un significato vicino.",
     "Controlla esplicitamente che la bozza non abbia alzato il registro rispetto all'originale: se è diventata più astratta, solenne o letteraria, riportala a una formulazione semplice e concreta.",
     "Individua le ancore semantiche dell'originale, cioè termini o frasi particolarmente precisi e naturali, e ripristinale quando la bozza le ha sostituite con equivalenti meno precisi.",
     "Controlla che emoji, simboli e altri elementi espressivi presenti nell'originale non siano stati eliminati senza motivo.",
+    "Penalizza e correggi formule come 'l'opera', 'la narrazione', 'il nodo centrale', 'si tratta di', 'è importante' o 'lavoro cinematografico' quando sostituiscono parole più semplici dell'originale senza un vantaggio reale.",
     "Se l'originale contiene un invito, un imperativo o una frase personale efficace, non trasformarlo in una raccomandazione impersonale.",
     "Controlla che il testo non sia diventato troppo levigato, simmetrico o prevedibile.",
     "Se due frasi consecutive hanno struttura o ritmo troppo simili, rendile più naturali senza introdurre nuove informazioni.",
