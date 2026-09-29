@@ -164,3 +164,22 @@ Il benchmark confronta:
 I risultati vengono salvati in `benchmark-results/latest.json` e `benchmark-results/summary.json`.
 
 Il punteggio euristico serve soltanto come segnale tecnico: non sostituisce una valutazione umana di naturalezza, fedeltà e qualità editoriale.
+
+
+### Benchmark da GitHub Actions
+
+È disponibile il workflow manuale **Benchmark Natural Writer**.
+
+Prima dell'esecuzione aggiungi nella repository il secret:
+
+```
+OPENAI_API_KEY
+```
+
+Poi vai in **Actions → Benchmark Natural Writer → Run workflow**.
+
+Puoi scegliere:
+- `benchmark_limit`: numero di testi campione;
+- `model`: modello OpenAI da usare.
+
+Il workflow esegue typecheck, benchmark e carica i risultati come artifact per 14 giorni.
