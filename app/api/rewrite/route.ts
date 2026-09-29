@@ -6,6 +6,7 @@ export const runtime = "nodejs";
 const allowedModes = new Set(["natural", "professional", "social"]);
 const allowedIntensities = new Set(["leggera", "media", "profonda"]);
 const allowedPlatforms = new Set(["instagram", "facebook", "linkedin", "x", "threads"]);
+const allowedPresets = new Set(["balanced", "editorial", "social-direct", "linkedin-personal", "journalistic", "political-comment", "storytelling", "minimal", "explainer", "civic"]);
 
 export async function POST(request: Request) {
   try {
@@ -41,6 +42,7 @@ export async function POST(request: Request) {
       emoji: Boolean(body.emoji),
       cta: Boolean(body.cta),
       question: Boolean(body.question),
+      preset: allowedPresets.has(body.preset) ? body.preset : "balanced",
     };
 
     if (body.mode === "social") {
