@@ -135,3 +135,32 @@ L'MVP include profili stilistici riutilizzabili basati su caratteristiche astrat
 - Post civico / attivismo
 
 Ogni preset modifica ritmo, densità, struttura, livello di formalità e tipo di apertura/chiusura, mantenendo i controlli di fedeltà sul contenuto.
+
+
+## Benchmark preset
+
+Il progetto include un benchmark interno per confrontare preset e intensità su testi campione.
+
+Esecuzione:
+
+```bash
+npm run benchmark
+```
+
+Per limitare il numero di testi elaborati:
+
+```bash
+BENCHMARK_LIMIT=2 npm run benchmark
+```
+
+Il benchmark confronta:
+- variazione di lunghezza;
+- lunghezza media delle frasi;
+- ripetizione delle aperture;
+- presenza di formule generiche;
+- abuso di enfasi;
+- qualità euristica complessiva.
+
+I risultati vengono salvati in `benchmark-results/latest.json` e `benchmark-results/summary.json`.
+
+Il punteggio euristico serve soltanto come segnale tecnico: non sostituisce una valutazione umana di naturalezza, fedeltà e qualità editoriale.
