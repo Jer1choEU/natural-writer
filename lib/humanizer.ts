@@ -274,6 +274,24 @@ function buildRewriteInstructions(options: HumanizeOptions, strategy?: Candidate
   ].join(" ");
 }
 
+
+function buildDepthRepairInstructions(options: HumanizeOptions) {
+  return [
+    "Esegui una revisione chirurgica contro il near-copy.",
+    "La versione corrente è semanticamente valida ma resta troppo vicina alla superficie dell'originale.",
+    "Mantieni rigorosamente gli stessi fatti, la stessa sequenza delle idee, la stessa funzione dei paragrafi, lo stesso tono e lo stesso grado di certezza.",
+    "Intervieni soltanto sulle frasi ancora troppo simili: ricostruisci sintassi, attacco, verbo reggente, subordinazione o segmentazione del periodo.",
+    "Non cercare sinonimi ricercati e non aumentare il registro.",
+    "Non cambiare ancore semantiche, nomi, numeri, citazioni o termini tecnici.",
+    intensityRules(options.intensity),
+    modeRules(options),
+    getPresetRules(options.preset),
+    getM5SStyleRules(),
+    `Tono richiesto: ${options.tone || "diretto"}.`,
+    "Restituisci esclusivamente il testo finale, senza note.",
+  ].join(" ");
+}
+
 function buildReviewInstructions(options: HumanizeOptions) {
   return [
     "Sei il revisore finale.",
@@ -306,6 +324,23 @@ function buildReviewInstructions(options: HumanizeOptions) {
     getM5SStyleRules(),
     "Restituisci esclusivamente la versione finale pronta all'uso.",
   ].join(" ");
+}
+
+
+function getRetryDelayMs(status: number, errorText: string, attempt: number) {
+  const exponentialDelay = 1000 * 2 ** (attempt - 1);
+  if (status !== 429) return exponentialDelay;
+
+  const retryMatch =
+    errorText.match(/retry in\s+([0-9.]+)s/i) ||
+    errorText.match(/"retryDelay"\s*:\s*"([0-9.]+)s"/i);
+
+  const suggestedSeconds = retryMatch ? Number(retryMatch[1]) : 0;
+  if (!Number.isFinite(suggestedSeconds) || suggestedSeconds <= 0) {
+    return Math.max(exponentialDelay, 10000);
+  }
+
+  return Math.max(exponentialDelay, Math.ceil(suggestedSeconds * 1000) + 750);
 }
 
 async function generateText(instructions: string, input: string, selectedModel: string) {
@@ -359,7 +394,7 @@ async function generateText(instructions: string, input: string, selectedModel: 
       throw lastError;
     }
 
-    const delayMs = 1000 * 2 ** (attempt - 1);
+    const delayMs = getRetryDelayMs(response.status, errorText, attempt);
     await new Promise((resolve) => setTimeout(resolve, delayMs));
   }
 
@@ -435,23 +470,62 @@ export async function humanizeText(text: string, options: HumanizeOptions) {
     selectedModel
   );
 
+  let finalText = finalPass.trim();
+  let finalSimilarity = surfaceSimilarity(text, finalText);
+  let depthRepairApplied = false;
+
+  const wordCount = text.trim().split(/\s+/).filter(Boolean).length;
+  const depthRepairThreshold =
+    options.intensity === "profonda"
+      ? 0.42
+      : options.intensity === "leggera"
+        ? 1
+        : 0.48;
+
+  if (wordCount >= 12 && finalSimilarity > depthRepairThreshold) {
+    finalText = (
+      await generateText(
+        buildDepthRepairInstructions(options),
+        [
+          "ORIGINALE:",
+          text,
+          "",
+          "OSSATURA SEMANTICA:",
+          semanticSkeleton,
+          "",
+          "VERSIONE DA RENDERE MENO LETTERALE:",
+          finalText,
+          "",
+          `SIMILARITÀ SUPERFICIALE ATTUALE: ${finalSimilarity}`,
+        ].join("\n"),
+        selectedModel
+      )
+    ).trim();
+    finalSimilarity = surfaceSimilarity(text, finalText);
+    depthRepairApplied = true;
+  }
+
+  const stages = [
+    "analysis",
+    "semantic-skeleton",
+    "multi-candidate-rewrite",
+    "candidate-ranking",
+    "faithfulness-review",
+  ];
+  if (depthRepairApplied) stages.push("near-copy-repair");
+
   return {
-    text: finalPass.trim(),
+    text: finalText,
     meta: {
       provider: "gemini",
       model: selectedModel,
-      stages: [
-        "analysis",
-        "semantic-skeleton",
-        "multi-candidate-rewrite",
-        "candidate-ranking",
-        "faithfulness-review",
-      ],
+      stages,
       candidates: drafts.length,
       selectedCandidate: candidateStrategies[selectedIndex].label,
       selectedStrategy: candidateStrategies[selectedIndex].id,
       selectedSurfaceSimilarity: similarities[selectedIndex],
-      finalSurfaceSimilarity: surfaceSimilarity(text, finalPass),
+      finalSurfaceSimilarity: finalSimilarity,
+      depthRepairApplied,
       mode: options.mode,
       intensity: options.intensity || "media",
       platform: options.mode === "social" ? options.platform || null : null,

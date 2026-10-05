@@ -15,6 +15,22 @@ export type QualityJudgeResult = {
 
 const judgeModel = process.env.GEMINI_JUDGE_MODEL || "gemini-3.5-flash-lite";
 
+function getJudgeRetryDelayMs(status: number, errorText: string, attempt: number) {
+  const exponentialDelay = 1000 * 2 ** (attempt - 1);
+  if (status !== 429) return exponentialDelay;
+
+  const retryMatch =
+    errorText.match(/retry in\s+([0-9.]+)s/i) ||
+    errorText.match(/"retryDelay"\s*:\s*"([0-9.]+)s"/i);
+  const suggestedSeconds = retryMatch ? Number(retryMatch[1]) : 0;
+
+  if (!Number.isFinite(suggestedSeconds) || suggestedSeconds <= 0) {
+    return Math.max(exponentialDelay, 10000);
+  }
+
+  return Math.max(exponentialDelay, Math.ceil(suggestedSeconds * 1000) + 750);
+}
+
 async function callJudge(prompt: string) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("GEMINI_API_KEY non configurata");
@@ -56,7 +72,9 @@ async function callJudge(prompt: string) {
       throw lastError;
     }
 
-    await new Promise((resolve) => setTimeout(resolve, 1000 * 2 ** (attempt - 1)));
+    await new Promise((resolve) =>
+      setTimeout(resolve, getJudgeRetryDelayMs(response.status, errorText, attempt))
+    );
   }
 
   throw lastError || new Error("Gemini judge error sconosciuto");

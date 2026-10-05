@@ -50,7 +50,7 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           BENCHMARK_MODELS: ${{ github.event_name == 'workflow_dispatch' && inputs.models || 'gemini-3.5-flash-lite' }}
           BENCHMARK_LIMIT: ${{ inputs.benchmark_limit || '1' }}
-          BENCHMARK_PRESETS: balanced,social-direct,journalistic
+          BENCHMARK_PRESETS: ${{ github.event_name == 'workflow_dispatch' && 'balanced,social-direct,journalistic' || 'balanced' }}
           BENCHMARK_INTENSITIES: media
           GEMINI_JUDGE_MODEL: gemini-3.5-flash-lite
         run: npm run benchmark
@@ -70,3 +70,6 @@ jobs:
 # rewrite-similarity-v1
 
 # semantic-structure-depth-judge-v2
+
+# quota-aware-retry-v1
+# conditional-near-copy-repair-v1
