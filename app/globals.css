@@ -122,3 +122,138 @@ textarea::placeholder { color: #59616d; }
     min-height: 360px;
   }
 }
+
+
+.trainingBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+  padding: 10px 14px;
+  border: 1px solid #262b33;
+  border-radius: 12px;
+  background: rgba(20, 23, 28, .74);
+  color: #8f98a5;
+  font-size: .82rem;
+}
+
+.trainingBar strong {
+  color: #dfe3e9;
+}
+
+.resetTraining {
+  border: 0;
+  background: transparent;
+  color: #78818e;
+  font-size: .8rem;
+  padding: 4px 6px;
+}
+
+.resetTraining:hover {
+  color: #c6cbd2;
+}
+
+.hint {
+  margin: 0;
+  color: #6f7884;
+  font-size: .78rem;
+  line-height: 1.45;
+  text-align: center;
+}
+
+.resultPanel {
+  min-height: 540px;
+}
+
+.emptyResult {
+  min-height: 460px;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  color: #59616d;
+  text-align: center;
+  line-height: 1.5;
+}
+
+.optionsGrid {
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+  flex: 1;
+}
+
+.optionCard {
+  display: flex;
+  flex-direction: column;
+  min-height: 230px;
+  border: 1px solid #2b3139;
+  border-radius: 12px;
+  background: rgba(13, 15, 18, .55);
+  overflow: hidden;
+  transition: border-color .18s ease, opacity .18s ease, transform .18s ease;
+}
+
+.optionCard.selected {
+  border-color: #7487ff;
+  transform: translateY(-1px);
+}
+
+.optionCard.rejected {
+  opacity: .62;
+}
+
+.optionToolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid #252a31;
+  color: #dfe3e9;
+}
+
+.optionCard textarea {
+  min-height: 170px;
+  flex: 1;
+  padding: 14px;
+  line-height: 1.55;
+}
+
+.choiceButton {
+  margin: 0 12px 12px;
+  border: 1px solid #39414d;
+  border-radius: 9px;
+  background: #1a1e24;
+  color: #d5dae1;
+  padding: 9px 12px;
+  font-weight: 700;
+}
+
+.choiceButton:hover:not(:disabled) {
+  border-color: #7487ff;
+}
+
+.optionCard.selected .choiceButton {
+  background: #7487ff;
+  border-color: #7487ff;
+  color: #fff;
+}
+
+@media (max-width: 980px) {
+  .trainingBar {
+    align-items: flex-start;
+  }
+
+  .resultPanel {
+    min-height: 0;
+  }
+
+  .emptyResult {
+    min-height: 300px;
+  }
+
+  .optionsGrid {
+    grid-template-columns: 1fr;
+  }
+}

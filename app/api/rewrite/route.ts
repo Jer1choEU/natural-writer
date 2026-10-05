@@ -1,7 +1,32 @@
 import { NextResponse } from "next/server";
-import { humanizeText, type HumanizeOptions } from "@/lib/humanizer";
+import {
+  humanizeText,
+  type HumanizeOptions,
+  type PreferenceExample,
+} from "@/lib/humanizer";
 
 export const runtime = "nodejs";
+
+function cleanPreferenceExamples(value: unknown): PreferenceExample[] {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .slice(-5)
+    .flatMap((raw) => {
+      if (!raw || typeof raw !== "object") return [];
+      const item = raw as Record<string, unknown>;
+
+      const original =
+        typeof item.original === "string" ? item.original.trim().slice(0, 1500) : "";
+      const preferred =
+        typeof item.preferred === "string" ? item.preferred.trim().slice(0, 1500) : "";
+      const rejected =
+        typeof item.rejected === "string" ? item.rejected.trim().slice(0, 1500) : "";
+
+      if (!original || !preferred || !rejected) return [];
+      return [{ original, preferred, rejected }];
+    });
+}
 
 export async function POST(request: Request) {
   try {
@@ -26,6 +51,8 @@ export async function POST(request: Request) {
       );
     }
 
+    const preferenceExamples = cleanPreferenceExamples(body.preferenceExamples);
+
     const options: HumanizeOptions = {
       mode: "social",
       tone: "diretto",
@@ -34,6 +61,8 @@ export async function POST(request: Request) {
       emoji: false,
       cta: false,
       question: false,
+      preferenceExamples,
+      returnAlternatives: true,
     };
 
     const result = await humanizeText(text, options);
