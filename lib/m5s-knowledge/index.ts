@@ -24,6 +24,29 @@ function normalize(value: string) {
     .trim();
 }
 
+const LOW_SIGNAL_KEYWORDS = new Set([
+  "lavoro",
+  "politica",
+  "persona",
+  "cultura",
+  "economia",
+  "impresa",
+  "imprese",
+  "scuola",
+  "territorio",
+  "cittadini",
+  "comunita",
+  "diritti",
+  "salute",
+  "sanita",
+]);
+
+function keywordWeight(keyword: string) {
+  if (keyword.includes(" ")) return 4;
+  if (LOW_SIGNAL_KEYWORDS.has(keyword)) return 1;
+  return 3;
+}
+
 function scoreEntry(text: string, entry: M5SKnowledgeEntry) {
   const normalizedTitle = normalize(entry.title);
   let score = normalizedTitle && text.includes(normalizedTitle) ? 6 : 0;
@@ -32,11 +55,11 @@ function scoreEntry(text: string, entry: M5SKnowledgeEntry) {
     const normalizedKeyword = normalize(keyword);
     if (!normalizedKeyword) continue;
     if (text.includes(normalizedKeyword)) {
-      score += normalizedKeyword.includes(" ") ? 4 : 2;
+      score += keywordWeight(normalizedKeyword);
     }
   }
 
-  if (entry.status === "foundational") score += score > 0 ? 1 : 0;
+  if (entry.status === "foundational" && score > 0) score += 1;
   return score;
 }
 
@@ -44,7 +67,7 @@ function rankMatches(text: string, entries: M5SKnowledgeEntry[], limit: number) 
   const normalized = normalize(text);
   return entries
     .map((entry) => ({ entry, score: scoreEntry(normalized, entry) }))
-    .filter((item) => item.score > 0)
+    .filter((item) => item.score >= 3)
     .sort((a, b) => b.score - a.score)
     .slice(0, limit)
     .map((item) => item.entry);
