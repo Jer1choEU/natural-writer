@@ -40,6 +40,9 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      - name: M5S knowledge check
+        run: npm run knowledge-check
+
       - name: Build
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
@@ -73,3 +76,5 @@ jobs:
 
 # quota-aware-retry-v1
 # conditional-near-copy-repair-v1
+
+# m5s-knowledge-check-v1

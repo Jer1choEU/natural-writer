@@ -613,6 +613,7 @@ export async function humanizeText(text: string, options: HumanizeOptions) {
   ];
   if (depthRepairApplied) stages.push("near-copy-repair");
   if (options.preferenceExamples?.length) stages.push("preference-conditioning");
+  if (m5sKnowledge.matches.length) stages.push("m5s-knowledge-conditioning");
 
   const alternatives = options.returnAlternatives
     ? finalized.map((candidate, position) => {
