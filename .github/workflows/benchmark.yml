@@ -14,6 +14,11 @@ on:
   push:
     paths:
       - ".github/workflows/benchmark.yml"
+      - "lib/**"
+      - "benchmarks/**"
+      - "scripts/**"
+      - "package.json"
+      - "tsconfig.json"
 
 jobs:
   benchmark:
