@@ -100,7 +100,7 @@ Assegna un punteggio da 0 a 10 per:
 - naturalness: suona come prosa umana naturale, non rigida o meccanica;
 - rhythm: varietà credibile di lunghezza e struttura delle frasi;
 - specificity: evita genericità e formulazioni vuote senza inventare dettagli;
-- semanticPrecision: conserva esattamente i concetti dell'originale e non usa sinonimi che ne spostano il significato;
+- semanticPrecision: conserva esattamente i concetti dell'originale e non usa sinonimi che ne spostano il significato. Controlla con particolare severità ruoli, qualifiche e azioni: termini plausibili ma non equivalenti sono uno slittamento semantico;
 - concreteness: mantiene o migliora la concretezza senza rendere il testo più astratto, solenne o letterario dell'originale;
 - antiTics: evita simmetrie artificiali, conclusioni automatiche, slogan, terne decorative, enfasi superflua e formule stereotipate;
 - semanticCoverage: conserva tutte le informazioni, negazioni, relazioni causali, inviti e sfumature dell'originale senza omissioni;
@@ -115,6 +115,8 @@ Per intensità profonda, una riscrittura quasi identica non dovrebbe ottenere re
 Per intensità leggera, non penalizzare una similarità elevata se gli interventi necessari sono stati fatti.
 Se c'è una perdita fattuale significativa, overall non può superare 6.
 Se ci sono informazioni inventate, overall non può superare 4.
+Se un ruolo o una qualifica viene sostituito con un ruolo soltanto plausibile ma non equivalente, semanticPrecision non può superare 8.
+Se un'azione generica viene trasformata in una modalità operativa più specifica non dichiarata dall'originale, semanticPrecision non può superare 8.
 
 Restituisci SOLO JSON valido con questa forma:
 {

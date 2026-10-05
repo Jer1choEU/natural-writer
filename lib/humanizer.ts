@@ -45,6 +45,8 @@ const antiTicRules = [
   "Evita nominalizzazioni che raffreddano una frase concreta: preferisci formule come 'smettiamo di vedere le persone' a costruzioni come 'perdita della capacità di riconoscere gli esseri umani' quando il significato è lo stesso.",
   "Non sostituire parole quotidiane con varianti più solenni senza beneficio: per esempio film non deve diventare opera, sapere non deve diventare conoscere, resta addosso non deve diventare lascia il segno solo per variare.",
   "Considera alcune parole o espressioni dell'originale come ancore semantiche: se sono centrali, naturali e precise, puoi lasciarle identiche anche in una riscrittura sostanziale.",
+  "Tratta ruoli, qualifiche, funzioni e categorie di soggetti come ancore semantiche: 'responsabili' non diventa 'coordinatori', 'dipendenti' non diventa 'collaboratori', salvo equivalenza esplicita nell'originale.",
+  "Non rendere più specifica un'azione generica: 'aggiornare il calendario' non significa necessariamente 'rivedere le date'; cambia la costruzione della frase senza inventare il modo concreto in cui l'azione verrà svolta.",
   "Preserva emoji, simboli e piccoli elementi espressivi dell'originale quando sono coerenti con il contesto; non rimuoverli automaticamente.",
 ];
 
@@ -219,6 +221,7 @@ function buildSemanticSkeletonInstructions(options: HumanizeOptions) {
     "Il JSON deve contenere: paragraphs, facts, claims, anchors, logicalRelations, certainty, tone, mustNotAdd.",
     "paragraphs deve descrivere, nello stesso ordine dell'originale, la funzione di ogni paragrafo e le idee che contiene.",
     "facts deve includere fatti, nomi propri, numeri, date, luoghi, citazioni e riferimenti verificabili presenti nel testo.",
+    "Tratta come fatti vincolanti anche ruoli, qualifiche, funzioni dei soggetti e il contenuto esatto delle azioni: non inferire sinonimi di ruolo o modalità operative non dichiarate.",
     "claims deve contenere tesi, giudizi, richieste, inviti e posizioni dell'autore senza rafforzarli o attenuarli.",
     "anchors deve contenere soltanto parole o espressioni che hanno un valore concettuale preciso e che sarebbe rischioso parafrasare.",
     "logicalRelations deve registrare causa, conseguenza, contrasto, condizione, esempio, cronologia e negazioni importanti.",
@@ -238,7 +241,8 @@ function buildRankingInstructions(options: HumanizeOptions) {
     "Per intensità media premia una vera riformulazione: stessa architettura delle idee ma superficie linguistica chiaramente diversa.",
     "Usa la similarità superficiale fornita come segnale, non come obiettivo assoluto. Una similarità molto alta indica possibile near-copy; una similarità molto bassa può indicare deriva semantica.",
     "Preferisci differenze ottenute tramite nuova sintassi e nuova costruzione della frase, non tramite sinonimi ricercati o innaturali.",
-    "Scarta una candidata se altera fatti, negazioni, causalità, soggetti, responsabilità, inviti o intensità del giudizio, anche se è stilisticamente bella.",
+    "Scarta una candidata se altera fatti, negazioni, causalità, soggetti, ruoli, qualifiche, responsabilità, azioni, inviti o intensità del giudizio, anche se è stilisticamente bella.",
+    "Considera errore semantico sostituire un ruolo con uno solo plausibile ma non equivalente, oppure trasformare un'azione generica in una modalità più specifica non dichiarata.",
     intensityRules(options.intensity),
     modeRules(options),
     getPresetRules(options.preset),
@@ -296,7 +300,8 @@ function buildReviewInstructions(options: HumanizeOptions) {
   return [
     "Sei il revisore finale.",
     "Confronta originale e bozza frase per frase sul piano del significato.",
-    "Ripristina qualunque fatto, numero, nome, citazione, sfumatura o rapporto causale alterato.",
+    "Ripristina qualunque fatto, numero, nome, citazione, ruolo, qualifica, azione, sfumatura o rapporto causale alterato.",
+    "Controlla in particolare le sostituzioni apparentemente innocue di ruoli e azioni: 'responsabile' non equivale automaticamente a 'coordinatore' e 'aggiornare un calendario' non equivale automaticamente a 'rivedere le date'.",
     "Rimuovi qualsiasi aggiunta non supportata dall'originale.",
     "Non preservare una formulazione della bozza solo perché è diversa: se introduce uno slittamento di significato, artificiosità o perdita di precisione, correggila.",
     "La fedeltà riguarda contenuto, tono, rapporti logici e precisione concettuale, non la conservazione della stessa superficie verbale.",
