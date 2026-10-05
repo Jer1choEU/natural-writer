@@ -6,6 +6,9 @@ export type QualityJudgeResult = {
   semanticPrecision: number;
   concreteness: number;
   antiTics: number;
+  semanticCoverage: number;
+  structurePreservation: number;
+  rewriteDepth: number;
   overall: number;
   notes: string[];
 };
@@ -65,7 +68,11 @@ function clampScore(value: unknown) {
   return Math.max(0, Math.min(10, Math.round(n * 10) / 10));
 }
 
-export async function judgeRewrite(original: string, rewritten: string): Promise<QualityJudgeResult> {
+export async function judgeRewrite(
+  original: string,
+  rewritten: string,
+  intensity: "leggera" | "media" | "profonda" = "media"
+): Promise<QualityJudgeResult> {
   const raw = await callJudge(`
 Valuta una riscrittura editoriale confrontandola con l'originale.
 
@@ -77,9 +84,17 @@ Assegna un punteggio da 0 a 10 per:
 - specificity: evita genericità e formulazioni vuote senza inventare dettagli;
 - semanticPrecision: conserva esattamente i concetti dell'originale e non usa sinonimi che ne spostano il significato;
 - concreteness: mantiene o migliora la concretezza senza rendere il testo più astratto, solenne o letterario dell'originale;
-- antiTics: evita simmetrie artificiali, conclusioni automatiche, slogan, terne decorative, enfasi superflua e formule stereotipate.
+- antiTics: evita simmetrie artificiali, conclusioni automatiche, slogan, terne decorative, enfasi superflua e formule stereotipate;
+- semanticCoverage: conserva tutte le informazioni, negazioni, relazioni causali, inviti e sfumature dell'originale senza omissioni;
+- structurePreservation: conserva ordine delle idee, funzione dei paragrafi e architettura argomentativa richiesta, anche se cambia la sintassi;
+- rewriteDepth: misura quanto la formulazione è stata realmente ricostruita invece di limitarsi a punteggiatura, piccoli sinonimi o spostamenti cosmetici. Non premiare la distanza se produce artificiosità o deriva semantica.
 
-overall deve riflettere il giudizio complessivo, con fidelity come requisito più importante.
+Intensità richiesta: ${intensity}.
+
+overall deve riflettere il giudizio complessivo, con fidelity e semanticCoverage come requisiti più importanti.
+Per intensità media, una riscrittura quasi identica all'originale non dovrebbe ottenere rewriteDepth superiore a 4.
+Per intensità profonda, una riscrittura quasi identica non dovrebbe ottenere rewriteDepth superiore a 3.
+Per intensità leggera, non penalizzare una similarità elevata se gli interventi necessari sono stati fatti.
 Se c'è una perdita fattuale significativa, overall non può superare 6.
 Se ci sono informazioni inventate, overall non può superare 4.
 
@@ -92,6 +107,9 @@ Restituisci SOLO JSON valido con questa forma:
   "semanticPrecision": 0,
   "concreteness": 0,
   "antiTics": 0,
+  "semanticCoverage": 0,
+  "structurePreservation": 0,
+  "rewriteDepth": 0,
   "overall": 0,
   "notes": ["massimo 3 osservazioni brevi"]
 }
@@ -111,6 +129,9 @@ ${rewritten}
     semanticPrecision: clampScore(raw.semanticPrecision),
     concreteness: clampScore(raw.concreteness),
     antiTics: clampScore(raw.antiTics),
+    semanticCoverage: clampScore(raw.semanticCoverage),
+    structurePreservation: clampScore(raw.structurePreservation),
+    rewriteDepth: clampScore(raw.rewriteDepth),
     overall: clampScore(raw.overall),
     notes: Array.isArray(raw.notes) ? raw.notes.slice(0, 3).map(String) : [],
   };

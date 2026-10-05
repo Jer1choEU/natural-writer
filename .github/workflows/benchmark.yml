@@ -48,7 +48,7 @@ jobs:
       - name: Run benchmark
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          BENCHMARK_MODELS: ${{ inputs.models || 'gemini-3.5-flash-lite,gemini-3.5-flash,gemini-3.8-flash' }}
+          BENCHMARK_MODELS: ${{ github.event_name == 'workflow_dispatch' && inputs.models || 'gemini-3.5-flash-lite' }}
           BENCHMARK_LIMIT: ${{ inputs.benchmark_limit || '1' }}
           BENCHMARK_PRESETS: balanced,social-direct,journalistic
           BENCHMARK_INTENSITIES: media
@@ -68,3 +68,5 @@ jobs:
 
 # qualitative-judge-v1
 # rewrite-similarity-v1
+
+# semantic-structure-depth-judge-v2

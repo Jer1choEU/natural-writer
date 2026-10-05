@@ -71,7 +71,7 @@ async function main() {
 
           let qualityJudge = null;
           try {
-            qualityJudge = await judgeRewrite(sample.text, rewritten.text);
+            qualityJudge = await judgeRewrite(sample.text, rewritten.text, intensity);
           } catch (judgeError) {
             console.error(`${sample.id} | ${preset} | ${intensity} | ${model} | JUDGE FAILED`);
             console.error(judgeError);
@@ -94,7 +94,7 @@ async function main() {
           });
 
           console.log(
-            `${sample.id} | ${preset} | ${intensity} | ${model} | heuristic ${results.at(-1)?.heuristicScore} | similarity ${results.at(-1)?.rewriteSimilarity} | quality ${qualityJudge?.overall ?? "n/a"}`
+            `${sample.id} | ${preset} | ${intensity} | ${model} | heuristic ${results.at(-1)?.heuristicScore} | similarity ${results.at(-1)?.rewriteSimilarity} | quality ${qualityJudge?.overall ?? "n/a"} | depth ${qualityJudge?.rewriteDepth ?? "n/a"} | structure ${qualityJudge?.structurePreservation ?? "n/a"}`
           );
         } catch (error) {
           console.error(`${sample.id} | ${preset} | ${intensity} | ${model} | FAILED`);
