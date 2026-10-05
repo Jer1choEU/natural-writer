@@ -48,6 +48,75 @@ const antiTicRules = [
   "Preserva emoji, simboli e piccoli elementi espressivi dell'originale quando sono coerenti con il contesto; non rimuoverli automaticamente.",
 ];
 
+
+type CandidateStrategy = "syntax-first" | "natural-first" | "distance-first";
+
+const candidateStrategies: Array<{ id: CandidateStrategy; label: string; rules: string[] }> = [
+  {
+    id: "syntax-first",
+    label: "A",
+    rules: [
+      "Strategia candidata A: privilegia una vera ricostruzione sintattica.",
+      "Cambia soprattutto attacco delle frasi, verbo reggente, coordinazione/subordinazione e disposizione interna dei complementi.",
+      "Conserva il lessico concettualmente preciso quando serve, ma evita di replicare la stessa struttura della frase originale.",
+    ],
+  },
+  {
+    id: "natural-first",
+    label: "B",
+    rules: [
+      "Strategia candidata B: privilegia naturalezza, voce e fluidità.",
+      "Riscrivi come farebbe una persona che ha compreso il testo e lo riscrive senza guardare la formulazione originale parola per parola.",
+      "Mantieni una distanza reale dall'originale, ma non sacrificare semplicità e spontaneità per essere diverso a tutti i costi.",
+    ],
+  },
+  {
+    id: "distance-first",
+    label: "C",
+    rules: [
+      "Strategia candidata C: cerca una distanza superficiale più marcata mantenendo invariati significato e struttura logica.",
+      "Evita sequenze di parole identiche all'originale quando possono essere riformulate in modo altrettanto preciso e naturale.",
+      "Non usare sinonimi forzati: ottieni la distanza soprattutto ricostruendo le frasi come unità di senso.",
+    ],
+  },
+];
+
+function wordBigrams(text: string) {
+  const tokens = text
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .split(/\s+/)
+    .filter(Boolean);
+
+  const bigrams = new Set<string>();
+  for (let i = 0; i < tokens.length - 1; i++) {
+    bigrams.add(`${tokens[i]} ${tokens[i + 1]}`);
+  }
+  return bigrams;
+}
+
+function surfaceSimilarity(original: string, rewritten: string) {
+  const a = wordBigrams(original);
+  const b = wordBigrams(rewritten);
+
+  if (a.size === 0 && b.size === 0) return 1;
+  if (a.size === 0 || b.size === 0) return 0;
+
+  let intersection = 0;
+  for (const item of a) {
+    if (b.has(item)) intersection += 1;
+  }
+
+  const union = new Set([...a, ...b]).size;
+  return Number((intersection / union).toFixed(3));
+}
+
+function parseCandidateChoice(value: string) {
+  const match = value.trim().toUpperCase().match(/\b([ABC])\b/);
+  if (!match) return 0;
+  return Math.max(0, Math.min(2, match[1].charCodeAt(0) - 65));
+}
+
 function intensityRules(intensity: HumanizeOptions["intensity"]) {
   switch (intensity) {
     case "leggera":
@@ -141,7 +210,44 @@ function buildAnalysisInstructions(options: HumanizeOptions) {
   ].join(" ");
 }
 
-function buildRewriteInstructions(options: HumanizeOptions) {
+
+function buildSemanticSkeletonInstructions(options: HumanizeOptions) {
+  return [
+    "Estrai l'ossatura semantica del testo prima della riscrittura.",
+    "Non riscrivere il testo e non proporre alternative stilistiche.",
+    "Restituisci SOLO JSON valido e compatto.",
+    "Il JSON deve contenere: paragraphs, facts, claims, anchors, logicalRelations, certainty, tone, mustNotAdd.",
+    "paragraphs deve descrivere, nello stesso ordine dell'originale, la funzione di ogni paragrafo e le idee che contiene.",
+    "facts deve includere fatti, nomi propri, numeri, date, luoghi, citazioni e riferimenti verificabili presenti nel testo.",
+    "claims deve contenere tesi, giudizi, richieste, inviti e posizioni dell'autore senza rafforzarli o attenuarli.",
+    "anchors deve contenere soltanto parole o espressioni che hanno un valore concettuale preciso e che sarebbe rischioso parafrasare.",
+    "logicalRelations deve registrare causa, conseguenza, contrasto, condizione, esempio, cronologia e negazioni importanti.",
+    "certainty deve indicare il grado di certezza, dubbio o cautela espresso dall'autore.",
+    "tone deve descrivere la voce dell'originale senza trasformarla.",
+    "mustNotAdd deve ricordare che non vanno introdotti fatti, esempi, interpretazioni o giudizi assenti.",
+    `Modalità: ${options.mode}. Intensità: ${options.intensity || "media"}.`,
+  ].join(" ");
+}
+
+function buildRankingInstructions(options: HumanizeOptions) {
+  return [
+    "Sei un selettore editoriale. Devi scegliere la migliore tra tre riscritture dello stesso testo.",
+    "Valuta prima di tutto fedeltà semantica completa: nessuna omissione sostanziale, nessuna aggiunta, nessuno slittamento di significato, nessun cambio del grado di certezza.",
+    "Verifica mentalmente l'equivalenza in entrambe le direzioni: tutto ciò che afferma l'originale deve essere recuperabile dalla riscrittura e tutto ciò che afferma la riscrittura deve essere supportato dall'originale.",
+    "Poi valuta naturalezza, concretezza, voce, ritmo e precisione.",
+    "Per intensità media premia una vera riformulazione: stessa architettura delle idee ma superficie linguistica chiaramente diversa.",
+    "Usa la similarità superficiale fornita come segnale, non come obiettivo assoluto. Una similarità molto alta indica possibile near-copy; una similarità molto bassa può indicare deriva semantica.",
+    "Preferisci differenze ottenute tramite nuova sintassi e nuova costruzione della frase, non tramite sinonimi ricercati o innaturali.",
+    "Scarta una candidata se altera fatti, negazioni, causalità, soggetti, responsabilità, inviti o intensità del giudizio, anche se è stilisticamente bella.",
+    intensityRules(options.intensity),
+    modeRules(options),
+    getPresetRules(options.preset),
+    `Tono richiesto: ${options.tone || "diretto"}.`,
+    "Restituisci ESCLUSIVAMENTE una singola lettera: A, B oppure C.",
+  ].join(" ");
+}
+
+function buildRewriteInstructions(options: HumanizeOptions, strategy?: CandidateStrategy) {
   return [
     "Riscrivi il testo come un editor umano.",
     "Preserva fatti, numeri, nomi propri, citazioni, tesi, posizione dell'autore e significato.",
@@ -162,6 +268,7 @@ function buildRewriteInstructions(options: HumanizeOptions) {
     modeRules(options),
     getPresetRules(options.preset),
     getM5SStyleRules(),
+    ...(strategy ? candidateStrategies.find((candidate) => candidate.id === strategy)?.rules || [] : []),
     `Tono richiesto: ${options.tone || "diretto"}.`,
     "Restituisci soltanto il testo riscritto, senza commenti, note, intestazioni o spiegazioni.",
   ].join(" ");
@@ -261,19 +368,55 @@ async function generateText(instructions: string, input: string, selectedModel: 
 
 export async function humanizeText(text: string, options: HumanizeOptions) {
   const selectedModel = options.model || defaultModel;
-  const analysis = await generateText(buildAnalysisInstructions(options), text, selectedModel);
 
-  const draft = await generateText(
-    buildRewriteInstructions(options),
-    [
-      "TESTO ORIGINALE:",
-      text,
+  const [analysis, semanticSkeleton] = await Promise.all([
+    generateText(buildAnalysisInstructions(options), text, selectedModel),
+    generateText(buildSemanticSkeletonInstructions(options), text, selectedModel),
+  ]);
+
+  const drafts = await Promise.all(
+    candidateStrategies.map((candidate) =>
+      generateText(
+        buildRewriteInstructions(options, candidate.id),
+        [
+          "TESTO ORIGINALE:",
+          text,
+          "",
+          "OSSATURA SEMANTICA DA PRESERVARE:",
+          semanticSkeleton,
+          "",
+          "PIANO EDITORIALE:",
+          analysis,
+        ].join("\n"),
+        selectedModel
+      )
+    )
+  );
+
+  const similarities = drafts.map((draft) => surfaceSimilarity(text, draft));
+
+  const rankingInput = [
+    "ORIGINALE:",
+    text,
+    "",
+    "OSSATURA SEMANTICA:",
+    semanticSkeleton,
+    "",
+    ...drafts.flatMap((draft, index) => [
+      `CANDIDATA ${candidateStrategies[index].label} — similarità superficiale: ${similarities[index]}`,
+      draft,
       "",
-      "PIANO EDITORIALE:",
-      analysis,
-    ].join("\n"),
+    ]),
+  ].join("\n");
+
+  const ranking = await generateText(
+    buildRankingInstructions(options),
+    rankingInput,
     selectedModel
   );
+
+  const selectedIndex = parseCandidateChoice(ranking);
+  const draft = drafts[selectedIndex];
 
   const finalPass = await generateText(
     buildReviewInstructions(options),
@@ -281,8 +424,13 @@ export async function humanizeText(text: string, options: HumanizeOptions) {
       "ORIGINALE:",
       text,
       "",
-      "BOZZA:",
+      "OSSATURA SEMANTICA:",
+      semanticSkeleton,
+      "",
+      "BOZZA SELEZIONATA:",
       draft,
+      "",
+      `SIMILARITÀ SUPERFICIALE DELLA BOZZA: ${similarities[selectedIndex]}`,
     ].join("\n"),
     selectedModel
   );
@@ -292,7 +440,18 @@ export async function humanizeText(text: string, options: HumanizeOptions) {
     meta: {
       provider: "gemini",
       model: selectedModel,
-      stages: ["analysis", "rewrite", "faithfulness-review"],
+      stages: [
+        "analysis",
+        "semantic-skeleton",
+        "multi-candidate-rewrite",
+        "candidate-ranking",
+        "faithfulness-review",
+      ],
+      candidates: drafts.length,
+      selectedCandidate: candidateStrategies[selectedIndex].label,
+      selectedStrategy: candidateStrategies[selectedIndex].id,
+      selectedSurfaceSimilarity: similarities[selectedIndex],
+      finalSurfaceSimilarity: surfaceSimilarity(text, finalPass),
       mode: options.mode,
       intensity: options.intensity || "media",
       platform: options.mode === "social" ? options.platform || null : null,
