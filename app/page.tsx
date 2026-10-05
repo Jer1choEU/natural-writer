@@ -16,6 +16,33 @@ type PreferenceRecord = {
   createdAt: string;
 };
 
+type PoliticalClassification =
+  | "carta-coerente"
+  | "nova-coerente"
+  | "in-tensione"
+  | "non-determinabile";
+
+type PoliticalCheckResult = {
+  overall: "coerente" | "misto" | "in-tensione" | "non-determinabile";
+  summary: string;
+  findings: Array<{
+    claim: string;
+    classification: PoliticalClassification;
+    explanation: string;
+    entryId: string | null;
+    entryTitle: string | null;
+    sourceIds: string[];
+  }>;
+  sources: Array<{
+    id: string;
+    title: string;
+    authority: string;
+    effectiveDate?: string;
+    url: string;
+  }>;
+  modelUsed: boolean;
+};
+
 const STORAGE_KEY = "natural-writer-preferences-v1";
 const MAX_STORED_PREFERENCES = 50;
 const MAX_USED_PREFERENCES = 5;
@@ -48,6 +75,9 @@ export default function Home() {
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [preferenceCount, setPreferenceCount] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [politicalLoading, setPoliticalLoading] = useState(false);
+  const [politicalResult, setPoliticalResult] = useState<PoliticalCheckResult | null>(null);
+  const [politicalError, setPoliticalError] = useState("");
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -55,8 +85,13 @@ export default function Home() {
   }, []);
 
   const canTransform = useMemo(
-    () => input.trim().length > 0 && !loading,
-    [input, loading]
+    () => input.trim().length > 0 && !loading && !politicalLoading,
+    [input, loading, politicalLoading]
+  );
+
+  const canCheckPolitics = useMemo(
+    () => input.trim().length > 0 && !loading && !politicalLoading,
+    [input, loading, politicalLoading]
   );
 
   async function transform() {
@@ -109,6 +144,62 @@ export default function Home() {
       setError(err instanceof Error ? err.message : "Errore imprevisto.");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function checkPolitics() {
+    if (!canCheckPolitics) return;
+
+    setPoliticalLoading(true);
+    setPoliticalError("");
+    setPoliticalResult(null);
+
+    try {
+      const response = await fetch("/api/political-check", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: input }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Errore durante il controllo politico.");
+      }
+
+      setPoliticalResult(data as PoliticalCheckResult);
+    } catch (err) {
+      setPoliticalError(
+        err instanceof Error ? err.message : "Errore imprevisto."
+      );
+    } finally {
+      setPoliticalLoading(false);
+    }
+  }
+
+  function politicalLabel(classification: PoliticalClassification) {
+    switch (classification) {
+      case "carta-coerente":
+        return "Coerente con la Carta";
+      case "nova-coerente":
+        return "Coerente con NOVA";
+      case "in-tensione":
+        return "In tensione";
+      default:
+        return "Non determinabile";
+    }
+  }
+
+  function overallLabel(overall: PoliticalCheckResult["overall"]) {
+    switch (overall) {
+      case "coerente":
+        return "Coerente";
+      case "misto":
+        return "Misto";
+      case "in-tensione":
+        return "In tensione";
+      default:
+        return "Non determinabile";
     }
   }
 
@@ -165,7 +256,11 @@ export default function Home() {
           </div>
           <textarea
             value={input}
-            onChange={(event) => setInput(event.target.value)}
+            onChange={(event) => {
+              setInput(event.target.value);
+              setPoliticalResult(null);
+              setPoliticalError("");
+            }}
             placeholder="Incolla qui il testo da riscrivere..."
           />
         </div>
@@ -174,8 +269,16 @@ export default function Home() {
           <button className="primary" disabled={!canTransform} onClick={transform}>
             {loading ? "Sto creando A/B..." : "Trasforma"}
           </button>
-          <p className="hint">Genera due versioni. Scegli quella che preferisci per allenare le riscritture successive.</p>
+          <button
+            className="secondary"
+            disabled={!canCheckPolitics}
+            onClick={checkPolitics}
+          >
+            {politicalLoading ? "Sto controllando..." : "Controlla coerenza M5S"}
+          </button>
+          <p className="hint">La riscrittura genera due versioni. Il controllo politico è separato e non modifica il testo.</p>
           {error && <p className="error">{error}</p>}
+          {politicalError && <p className="error">{politicalError}</p>}
         </aside>
 
         <div className="panel resultPanel">
@@ -239,6 +342,79 @@ export default function Home() {
           )}
         </div>
       </section>
+
+      {(politicalLoading || politicalResult) && (
+        <section className="coherencePanel">
+          <div className="coherenceHeader">
+            <div>
+              <strong>Coerenza politica M5S</strong>
+              <p>Confronto documentale separato dalla riscrittura.</p>
+            </div>
+            {politicalResult && (
+              <span className={`overallBadge overall-${politicalResult.overall}`}>
+                {overallLabel(politicalResult.overall)}
+              </span>
+            )}
+          </div>
+
+          {politicalLoading ? (
+            <div className="coherenceLoading">
+              Analizzo solo le fonti ufficiali pertinenti...
+            </div>
+          ) : politicalResult ? (
+            <>
+              <p className="coherenceSummary">{politicalResult.summary}</p>
+
+              {politicalResult.findings.length === 0 ? (
+                <div className="noFindings">
+                  Nessuna posizione esplicita classificabile con sufficiente sicurezza.
+                </div>
+              ) : (
+                <div className="findingsList">
+                  {politicalResult.findings.map((finding, index) => (
+                    <article className="findingCard" key={`${finding.entryId || "none"}-${index}`}>
+                      <div className="findingTopline">
+                        <span className={`findingBadge finding-${finding.classification}`}>
+                          {politicalLabel(finding.classification)}
+                        </span>
+                        {finding.entryTitle && (
+                          <span className="findingReference">{finding.entryTitle}</span>
+                        )}
+                      </div>
+                      <strong className="findingClaim">{finding.claim}</strong>
+                      <p>{finding.explanation}</p>
+                    </article>
+                  ))}
+                </div>
+              )}
+
+              {politicalResult.sources.length > 0 && (
+                <div className="coherenceSources">
+                  <strong>Fonti ufficiali usate</strong>
+                  <div className="sourceLinks">
+                    {politicalResult.sources.map((source) => (
+                      <a
+                        href={source.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        key={source.id}
+                      >
+                        {source.title}
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {!politicalResult.modelUsed && (
+                <p className="modelNote">
+                  Nessuna chiamata al modello: il retrieval non ha trovato una base ufficiale abbastanza pertinente.
+                </p>
+              )}
+            </>
+          ) : null}
+        </section>
+      )}
     </main>
   );
 }

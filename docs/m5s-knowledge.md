@@ -45,3 +45,25 @@ Le URL ufficiali e le date sono definite in `lib/m5s-knowledge/sources.ts`.
 - restituisce un contesto compatto con fonte e livello di autorità.
 
 Questo evita di inviare al modello l'intero corpus a ogni riscrittura.
+
+
+## Controllo di coerenza politica
+
+Il controllo politico è separato dalla riscrittura e non modifica il testo.
+
+`checkM5SPoliticalCoherence(text)` usa due passaggi:
+1. retrieval deterministico delle sole voci ufficiali pertinenti;
+2. valutazione semantica su quelle evidenze, senza usare conoscenza politica esterna.
+
+Classificazioni possibili per ogni affermazione:
+- **carta-coerente** — coerente con un principio fondante della Carta;
+- **nova-coerente** — coerente con una posizione deliberata dagli iscritti;
+- **in-tensione** — contraddizione o opposizione esplicita a una evidenza pertinente;
+- **non-determinabile** — il corpus non consente una conclusione affidabile.
+
+Regole conservative:
+- una descrizione neutra non è una posizione politica;
+- assenza di una posizione non equivale a contrasto;
+- una parola chiave generica non basta per classificare;
+- una tensione richiede una contraddizione esplicita;
+- se il retrieval non trova evidenze pertinenti, non viene chiamato il modello e il risultato è non determinabile.

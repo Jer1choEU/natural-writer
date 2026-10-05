@@ -43,6 +43,9 @@ jobs:
       - name: M5S knowledge check
         run: npm run knowledge-check
 
+      - name: M5S coherence check
+        run: npm run coherence-check
+
       - name: Build
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
@@ -78,3 +81,4 @@ jobs:
 # conditional-near-copy-repair-v1
 
 # m5s-knowledge-check-v1
+\n# m5s-coherence-check-v1\n
