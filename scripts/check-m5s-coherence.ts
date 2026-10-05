@@ -44,12 +44,19 @@ assert(
   "Mixed findings should derive overall=misto."
 );
 
-const neutral = await checkM5SPoliticalCoherence(
-  "La riunione si è svolta martedì mattina e ha coinvolto i responsabili dei tre gruppi di lavoro."
-);
-assert(
-  neutral.overall === "non-determinabile" && neutral.modelUsed === false,
-  "Neutral text must be non-determinabile without calling the model."
-);
+async function main() {
+  const neutral = await checkM5SPoliticalCoherence(
+    "La riunione si è svolta martedì mattina e ha coinvolto i responsabili dei tre gruppi di lavoro."
+  );
+  assert(
+    neutral.overall === "non-determinabile" && neutral.modelUsed === false,
+    "Neutral text must be non-determinabile without calling the model."
+  );
 
-console.log("M5S political coherence checks passed.");
+  console.log("M5S political coherence checks passed.");
+}
+
+main().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});
