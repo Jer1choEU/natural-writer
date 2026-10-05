@@ -1,5 +1,6 @@
 import { getPresetRules, type StylePreset } from "@/lib/style-presets";
-import { getM5SStyleRules } from "@/lib/m5s-style";\nimport { getM5SKnowledgeContext } from "@/lib/m5s-knowledge";
+import { getM5SStyleRules } from "@/lib/m5s-style";
+import { getM5SKnowledgeContext } from "@/lib/m5s-knowledge";
 
 export type RewriteMode = "natural" | "professional" | "social";
 
