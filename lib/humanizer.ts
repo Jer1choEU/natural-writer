@@ -1,5 +1,5 @@
 import { getPresetRules, type StylePreset } from "@/lib/style-presets";
-import { getM5SStyleRules } from "@/lib/m5s-style";
+import { getM5SStyleRules } from "@/lib/m5s-style";\nimport { getM5SKnowledgeContext } from "@/lib/m5s-knowledge";
 
 export type RewriteMode = "natural" | "professional" | "social";
 
@@ -456,7 +456,8 @@ async function finalizeDraft(
   draft: string,
   draftSimilarity: number,
   options: HumanizeOptions,
-  selectedModel: string
+  selectedModel: string,
+  knowledgeContext: string
 ) {
   const finalPass = await generateText(
     buildReviewInstructions(options),
@@ -466,6 +467,7 @@ async function finalizeDraft(
       "",
       "OSSATURA SEMANTICA:",
       semanticSkeleton,
+      ...(knowledgeContext ? ["", knowledgeContext] : []),
       "",
       "BOZZA SELEZIONATA:",
       draft,
@@ -497,6 +499,7 @@ async function finalizeDraft(
           "",
           "OSSATURA SEMANTICA:",
           semanticSkeleton,
+          ...(knowledgeContext ? ["", knowledgeContext] : []),
           "",
           "VERSIONE DA RENDERE MENO LETTERALE:",
           finalText,
@@ -519,9 +522,18 @@ async function finalizeDraft(
 
 export async function humanizeText(text: string, options: HumanizeOptions) {
   const selectedModel = options.model || defaultModel;
+  const m5sKnowledge = getM5SKnowledgeContext(text);
 
   const [analysis, semanticSkeleton] = await Promise.all([
-    generateText(buildAnalysisInstructions(options), text, selectedModel),
+    generateText(
+      buildAnalysisInstructions(options),
+      [
+        "TESTO:",
+        text,
+        ...(m5sKnowledge.context ? ["", m5sKnowledge.context] : []),
+      ].join("\n"),
+      selectedModel
+    ),
     generateText(buildSemanticSkeletonInstructions(options), text, selectedModel),
   ]);
 
@@ -538,6 +550,7 @@ export async function humanizeText(text: string, options: HumanizeOptions) {
           "",
           "PIANO EDITORIALE:",
           analysis,
+          ...(m5sKnowledge.context ? ["", m5sKnowledge.context] : []),
         ].join("\n"),
         selectedModel
       )
@@ -552,6 +565,7 @@ export async function humanizeText(text: string, options: HumanizeOptions) {
     "",
     "OSSATURA SEMANTICA:",
     semanticSkeleton,
+    ...(m5sKnowledge.context ? ["", m5sKnowledge.context] : []),
     "",
     ...drafts.flatMap((draft, index) => [
       `CANDIDATA ${candidateStrategies[index].label} — similarità superficiale: ${similarities[index]}`,
@@ -579,7 +593,8 @@ export async function humanizeText(text: string, options: HumanizeOptions) {
         drafts[index],
         similarities[index],
         options,
-        selectedModel
+        selectedModel,
+        m5sKnowledge.context
       )
     )
   );
@@ -625,6 +640,13 @@ export async function humanizeText(text: string, options: HumanizeOptions) {
       depthRepairApplied: primary.depthRepairApplied,
       preferenceExamplesUsed: Math.min(options.preferenceExamples?.length || 0, 5),
       alternativesReturned: alternatives?.length || 0,
+      m5sKnowledgeMatches: m5sKnowledge.matches.map((entry) => ({
+        id: entry.id,
+        type: entry.type,
+        title: entry.title,
+        status: entry.status,
+      })),
+      m5sKnowledgeSourceIds: m5sKnowledge.sourceIds,
       mode: options.mode,
       intensity: options.intensity || "media",
       platform: options.mode === "social" ? options.platform || null : null,
