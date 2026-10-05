@@ -4,7 +4,7 @@ Natural Writer è una web app che trasforma testi rigidi, impersonali o generati
 
 ## Obiettivo
 
-Il progetto è un editor di riscrittura stilistica. Non ha come obiettivo l'elusione di sistemi di rilevazione.
+Il progetto è un editor di riscrittura stilistica. 
 
 Principi:
 - preservare significato, fatti, nomi e numeri;
