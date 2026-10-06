@@ -40,6 +40,9 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      - name: Preference profile check
+        run: npm run profile-check
+
       - name: M5S knowledge check
         run: npm run knowledge-check
 

@@ -45,7 +45,7 @@ type PoliticalCheckResult = {
 
 const STORAGE_KEY = "natural-writer-preferences-v1";
 const MAX_STORED_PREFERENCES = 50;
-const MAX_USED_PREFERENCES = 5;
+const MAX_RECENT_EXAMPLES = 3;
 
 function readPreferences(): PreferenceRecord[] {
   if (typeof window === "undefined") return [];
@@ -104,7 +104,7 @@ export default function Home() {
 
     try {
       const storedPreferences = readPreferences();
-      const preferenceExamples = storedPreferences.slice(-MAX_USED_PREFERENCES);
+      const preferenceExamples = storedPreferences.slice(-MAX_STORED_PREFERENCES);
 
       const response = await fetch("/api/rewrite", {
         method: "POST",
@@ -238,7 +238,7 @@ export default function Home() {
         <span>
           Training locale: <strong>{preferenceCount}</strong> scelte
           {preferenceCount > 0 && (
-            <> · il motore usa le ultime {Math.min(preferenceCount, MAX_USED_PREFERENCES)}</>
+            <> · profilo su {preferenceCount} scelte · ultimi {Math.min(preferenceCount, MAX_RECENT_EXAMPLES)} esempi diretti</>
           )}
         </span>
         {preferenceCount > 0 && (

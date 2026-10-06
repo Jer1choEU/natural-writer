@@ -11,17 +11,17 @@ function cleanPreferenceExamples(value: unknown): PreferenceExample[] {
   if (!Array.isArray(value)) return [];
 
   return value
-    .slice(-5)
+    .slice(-50)
     .flatMap((raw) => {
       if (!raw || typeof raw !== "object") return [];
       const item = raw as Record<string, unknown>;
 
       const original =
-        typeof item.original === "string" ? item.original.trim().slice(0, 1500) : "";
+        typeof item.original === "string" ? item.original.trim().slice(0, 1200) : "";
       const preferred =
-        typeof item.preferred === "string" ? item.preferred.trim().slice(0, 1500) : "";
+        typeof item.preferred === "string" ? item.preferred.trim().slice(0, 1200) : "";
       const rejected =
-        typeof item.rejected === "string" ? item.rejected.trim().slice(0, 1500) : "";
+        typeof item.rejected === "string" ? item.rejected.trim().slice(0, 1200) : "";
 
       if (!original || !preferred || !rejected) return [];
       return [{ original, preferred, rejected }];
