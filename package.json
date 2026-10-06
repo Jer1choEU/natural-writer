@@ -9,7 +9,8 @@
     "typecheck": "tsc --noEmit",
     "benchmark": "tsx scripts/run-benchmark.ts",
     "knowledge-check": "tsx scripts/check-m5s-knowledge.ts",
-    "coherence-check": "tsx scripts/check-m5s-coherence.ts"
+    "coherence-check": "tsx scripts/check-m5s-coherence.ts",
+    "profile-check": "tsx scripts/check-preference-profile.ts"
   },
   "dependencies": {
     "next": "15.5.7",
