@@ -13,9 +13,7 @@ Principi:
 - adattare il testo al contesto e al pubblico;
 - trasformare direttamente un testo in un post social pronto all'uso.
 
-## MVP
-
-### Modalità
+## Modalità
 - **Naturale** — riscrittura equilibrata e scorrevole.
 - **Professionale** — più chiara, ordinata e adatta a contesti di lavoro.
 - **Social post** — adatta il contenuto a un social network.
@@ -37,21 +35,37 @@ Parametri:
 
 ## Humanization Engine
 
-Il motore usa tre passaggi:
+Il motore usa una pipeline multi-pass:
 
 ```
 testo originale
   ↓
-analisi stilistica
+analisi stilistica + ossatura semantica
   ↓
-riscrittura
+3 strategie di riscrittura indipendenti
   ↓
-controllo di fedeltà + rifinitura
+ranking delle candidate
+  ↓
+controllo di fedeltà
+  ↓
+eventuale near-copy repair
   ↓
 output finale
 ```
 
-L'ultimo passaggio confronta originale e bozza per ridurre alterazioni di significato e aggiunte non supportate.
+Il controllo finale confronta originale e bozza per ridurre alterazioni di significato, aggiunte non supportate e slittamenti di tono o certezza.
+
+## Training stilistico
+
+Ogni scelta A/B può contribuire a un profilo stilistico aggregato.
+
+Il training usa due livelli:
+- **profilo aggregato**: fino a 50 confronti vengono trasformati in segnali ricorrenti, come distanza dall'originale, concisione, ritmo delle frasi, semplicità lessicale e preferenze di punteggiatura;
+- **memoria recente**: gli ultimi 3 confronti vengono mantenuti come esempi diretti per dettagli di voce che le metriche non catturano.
+
+Il profilo è conservativo: una singola scelta ha peso basso e fedeltà semantica e naturalezza hanno sempre priorità.
+
+Per ora lo storico resta nel browser tramite `localStorage`; la persistenza account/server e la sincronizzazione tra dispositivi sono ancora da implementare.
 
 ## Stack
 
@@ -83,7 +97,7 @@ Poi apri `http://localhost:3000`.
 
 ## Stato
 
-🚧 MVP funzionante lato codice. Serve configurare `GEMINI_API_KEY` nell'ambiente di deploy per effettuare trasformazioni reali.
+🟡 **Beta interna funzionale.** Riscrittura, confronto A/B, training stilistico aggregato, benchmark, knowledge base M5S e controllo di coerenza politica sono operativi. Per il deploy serve `GEMINI_API_KEY`; la principale lacuna infrastrutturale rimasta è la persistenza del training tra dispositivi.
 
 
 ## Regole qualitative
@@ -121,7 +135,7 @@ L'ultimo passaggio confronta la bozza con l'originale per evitare:
 
 ## Preset di stile
 
-L'MVP include profili stilistici riutilizzabili basati su caratteristiche astratte di scrittura, non sull'imitazione di una persona specifica:
+Il motore include profili stilistici riutilizzabili basati su caratteristiche astratte di scrittura, non sull'imitazione di una persona specifica:
 
 - Naturale equilibrato
 - Editoriale autorevole
@@ -182,12 +196,12 @@ Puoi scegliere:
 - `benchmark_limit`: numero di testi campione;
 - `model`: modello Gemini da usare.
 
-Il workflow esegue typecheck, benchmark e carica i risultati come artifact per 14 giorni.
+Il workflow esegue typecheck, regression check del profilo stilistico, controlli M5S, build, benchmark e carica i risultati come artifact per 14 giorni.
 
 
 ## Provider predefinito
 
-Natural Writer usa **Gemini 3.5 Flash-Lite** come modello predefinito per l'MVP, così il progetto può partire usando il free tier della Gemini Developer API.
+Natural Writer usa **Gemini 3.5 Flash-Lite** come modello predefinito, così il progetto può partire usando il free tier della Gemini Developer API.
 
 Il provider è isolato dal resto del motore, quindi in futuro sarà possibile aggiungere OpenAI, OpenRouter, Mistral o altri backend senza riscrivere l'interfaccia.
 
