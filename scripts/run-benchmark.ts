@@ -3,6 +3,8 @@ import path from "node:path";
 import { humanizeText, type HumanizeOptions } from "../lib/humanizer";
 import { BENCHMARK_SAMPLES } from "../benchmarks/samples";
 import { analyzeText, heuristicScore, rewriteSimilarity } from "../benchmarks/scoring";
+import { analyzeItalianText } from "../lib/editorial-metrics";
+import { checkSemanticGuard } from "../lib/semantic-guard";
 import { judgeRewrite } from "../benchmarks/quality-judge";
 
 const allPresets = [
@@ -87,6 +89,10 @@ async function main() {
             rewritten: rewritten.text,
             originalMetrics,
             rewrittenMetrics,
+            italianMetricsOriginal: analyzeItalianText(sample.text),
+            italianMetricsRewritten: analyzeItalianText(rewritten.text),
+            semanticGuard: checkSemanticGuard(sample.text, rewritten.text),
+            engineMeta: rewritten.meta,
             heuristicScore: heuristicScore(originalMetrics, rewrittenMetrics),
             rewriteSimilarity: rewriteSimilarity(sample.text, rewritten.text),
             qualityJudge,
