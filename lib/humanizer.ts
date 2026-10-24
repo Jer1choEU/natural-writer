@@ -836,6 +836,17 @@ export async function humanizeText(text: string, options: HumanizeOptions) {
     });
   }
   const noSafeImprovement = verified.length === 0;
+  if (noSafeImprovement) {
+    // Source-safe diagnostics only: never log the user's original or drafts.
+    console.warn("Natural Writer safe-original diagnostic", JSON.stringify({
+      claimCount: ledger.claims.length,
+      candidates: ranked.length,
+      viableCandidates: viable.length,
+      editorialReasons: ranked.map((candidate) => candidate.assessment.reason),
+      judgesAvailable: ranked.map((candidate) => candidate.quality !== null),
+      verifiedCandidates: verified.length,
+    }));
+  }
   const first = verified[0] || {
     ...ranked[0],
     text, finalSimilarity: 1, depthRepairApplied: false,
