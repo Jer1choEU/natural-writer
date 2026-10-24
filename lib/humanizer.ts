@@ -1,4 +1,7 @@
 import { getPresetRules, type StylePreset } from "@/lib/style-presets";
+import { checkSemanticGuard, formatSemanticIssues } from "@/lib/semantic-guard";
+import { identifyEditorialFlags } from "@/lib/editorial-metrics";
+import { judgeRewrite } from "@/benchmarks/quality-judge";
 import { getM5SStyleRules } from "@/lib/m5s-style";
 import { getM5SKnowledgeContext } from "@/lib/m5s-knowledge";
 import {
@@ -28,6 +31,8 @@ export type HumanizeOptions = {
   preferenceExamples?: PreferenceExample[];
   preferenceProfile?: StylePreferenceProfile;
   returnAlternatives?: boolean;
+  lockedTerms?: string[];
+  politicalStyle?: boolean;
 };
 
 const defaultModel = process.env.GEMINI_MODEL || "gemini-3.5-flash-lite";
@@ -163,15 +168,15 @@ function intensityRules(intensity: HumanizeOptions["intensity"]) {
       ].join(" ");
     default:
       return [
-        "Obiettivo dell'intensità media: produrre una vera riscrittura, non una semplice revisione dell'originale.",
+        "Obiettivo dell'intensità media: intervenire sui passaggi rigidi e ripetitivi, conservando quelli già efficaci.",
         "Mantieni la stessa struttura logica: stesso ordine delle idee, stessa funzione dei paragrafi, stessi rapporti tra causa, conseguenza, contrasto, esempio e conclusione.",
         "La forma linguistica, invece, deve cambiare in modo percepibile. Riscrivi le frasi come unità di senso, non parola per parola.",
-        "Nella maggior parte delle frasi non banali modifica almeno uno o due elementi tra: attacco, verbo principale, costruzione sintattica, ordine interno dei complementi, coordinazione o subordinazione, segmentazione del periodo.",
+        "Cambia attacco, verbo principale e struttura quando migliorano davvero la frase; non forzare modifiche inutili.",
         "Puoi mantenere identiche le ancore semantiche davvero precise, i nomi, i termini tecnici e le espressioni che perderebbero significato se parafrasate; tutto il resto può essere riformulato se resta naturale.",
-        "Evita di conservare intere frasi soltanto perché sono già corrette: se puoi esprimere esattamente la stessa idea in una forma diversa e altrettanto naturale, fallo.",
+        "Conserva le frasi già precise, spontanee e ben scritte.",
         "Non inseguire sinonimi: una buona riscrittura nasce da una nuova costruzione della frase, non dalla sostituzione lessicale meccanica.",
         "Mantieni per quanto possibile il numero e l'ordine dei paragrafi; spezza o unisci periodi solo all'interno dello stesso blocco logico quando migliora il ritmo.",
-        "Il risultato deve essere chiaramente riconoscibile come una nuova formulazione, pur dicendo la stessa cosa con la stessa voce, lo stesso livello di enfasi e la stessa architettura argomentativa.",
+        "Il risultato deve essere più naturale e leggibile, senza perseguire una distanza lessicale artificiale.",
       ].join(" ");
   }
 }
@@ -259,7 +264,7 @@ function buildAnalysisInstructions(options: HumanizeOptions) {
     "Non giudicare se il testo sia stato scritto da una IA e non cercare di eludere sistemi di rilevazione.",
     `Modalità richiesta: ${options.mode}.`,
     `Intensità: ${options.intensity || "media"}.`,
-    getM5SStyleRules(),
+    ...(options.politicalStyle ? [getM5SStyleRules()] : []),
     "Restituisci un piano di riscrittura molto conciso, massimo 8 punti, senza riscrivere ancora il testo.",
   ].join(" ");
 }
@@ -290,8 +295,8 @@ function buildRankingInstructions(options: HumanizeOptions) {
     "Valuta prima di tutto fedeltà semantica completa: nessuna omissione sostanziale, nessuna aggiunta, nessuno slittamento di significato, nessun cambio del grado di certezza.",
     "Verifica mentalmente l'equivalenza in entrambe le direzioni: tutto ciò che afferma l'originale deve essere recuperabile dalla riscrittura e tutto ciò che afferma la riscrittura deve essere supportato dall'originale.",
     "Poi valuta naturalezza, concretezza, voce, ritmo e precisione.",
-    "Per intensità media premia una vera riformulazione: stessa architettura delle idee ma superficie linguistica chiaramente diversa.",
-    "Usa la similarità superficiale fornita come segnale, non come obiettivo assoluto. Una similarità molto alta indica possibile near-copy; una similarità molto bassa può indicare deriva semantica.",
+    "Premia il miglioramento editoriale, non la distanza artificiale dalla superficie del testo.",
+    "La similarità superficiale è solo un indicatore: non premiarla o penalizzarla automaticamente.",
     "Preferisci differenze ottenute tramite nuova sintassi e nuova costruzione della frase, non tramite sinonimi ricercati o innaturali.",
     "Scarta una candidata se altera fatti, negazioni, causalità, soggetti, ruoli, qualifiche, responsabilità, azioni, inviti o intensità del giudizio, anche se è stilisticamente bella.",
     "Considera errore semantico sostituire un ruolo con uno solo plausibile ma non equivalente, oppure trasformare un'azione generica in una modalità più specifica non dichiarata.",
@@ -319,12 +324,12 @@ function buildRewriteInstructions(options: HumanizeOptions, strategy?: Candidate
     "Non correggere una voce personale solo perché è irregolare: correggi ciò che suona meccanico, non ciò che suona umano.",
     "Conserva la macrostruttura del testo, ma non imitare la sintassi dell'originale frase per frase.",
     "Parafrasa per unità di senso: prima comprendi l'idea completa, poi esprimila di nuovo con una costruzione autonoma e naturale.",
-    "Quando puoi scegliere tra una bozza quasi identica e una formulazione diversa ma semanticamente equivalente, preferisci la seconda se resta semplice, precisa e credibile.",
+    "Quando puoi scegliere tra due formulazioni equivalenti, preferisci quella realmente più naturale.",
     ...antiTicRules,
     intensityRules(options.intensity),
     modeRules(options),
     getPresetRules(options.preset),
-    getM5SStyleRules(),
+    ...(options.politicalStyle ? [getM5SStyleRules()] : []),
     buildPreferenceRules(options),
     ...(strategy ? candidateStrategies.find((candidate) => candidate.id === strategy)?.rules || [] : []),
     `Tono richiesto: ${options.tone || "diretto"}.`,
@@ -344,7 +349,7 @@ function buildDepthRepairInstructions(options: HumanizeOptions) {
     intensityRules(options.intensity),
     modeRules(options),
     getPresetRules(options.preset),
-    getM5SStyleRules(),
+    ...(options.politicalStyle ? [getM5SStyleRules()] : []),
     buildPreferenceRules(options),
     `Tono richiesto: ${options.tone || "diretto"}.`,
     "Restituisci esclusivamente il testo finale, senza note.",
@@ -372,7 +377,7 @@ function buildReviewInstructions(options: HumanizeOptions) {
     "Controlla che il testo non sia diventato troppo levigato, simmetrico o prevedibile.",
     "Se due frasi consecutive hanno struttura o ritmo troppo simili, rendile più naturali senza introdurre nuove informazioni.",
     "Verifica anche il problema opposto: se la bozza conserva troppe frasi quasi identiche all'originale, riformula le parti non protette cambiando realmente la costruzione sintattica, senza toccare le ancore semantiche.",
-    "Per intensità media, il testo finale deve conservare la stessa architettura delle idee ma risultare chiaramente riscritto nella maggior parte dei passaggi: evita sequenze estese copiate quasi letteralmente quando possono essere espresse diversamente senza perdita di precisione.",
+    "Per intensità media verifica che i passaggi problematici siano stati migliorati, senza alterare quelli già efficaci.",
     "Esegui un passaggio finale dedicato alla punteggiatura: controlla incisi, subordinate, coordinazioni, domande, due punti e pause interne.",
     "Correggi virgole mancanti intorno agli incisi quando servono alla leggibilità; evita però la virgola tra soggetto e verbo o tra verbo e complemento diretto.",
     "Quando una frase è troppo lunga, valuta un punto fermo invece di accumulare virgole.",
@@ -381,7 +386,7 @@ function buildReviewInstructions(options: HumanizeOptions) {
     intensityRules(options.intensity),
     modeRules(options),
     getPresetRules(options.preset),
-    getM5SStyleRules(),
+    ...(options.politicalStyle ? [getM5SStyleRules()] : []),
     buildPreferenceRules(options),
     "Restituisci esclusivamente la versione finale pronta all'uso.",
   ].join(" ");
