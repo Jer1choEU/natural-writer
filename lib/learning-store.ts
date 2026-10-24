@@ -119,6 +119,9 @@ async function consolidate(owner: string, mode: LearningMode) {
   const snapshot = await lastSnapshot(owner, mode);
   const calculated = await calculateProfile(owner, mode);
   const previousCount = number(snapshot?.event_count);
+  // No snapshot for a mode with zero observations. A Social selection must not
+  // create a phantom "Natural" version (and vice versa).
+  if (calculated.eventCount === 0) return;
   if (snapshot && (calculated.eventCount <= previousCount ||
     (calculated.eventCount > 5 && calculated.eventCount - previousCount < 5))) return;
   const version = number(snapshot?.version) + 1;
@@ -160,7 +163,7 @@ export async function getLearningStatus(owner: string) {
   });
   const pins = await db.execute({ sql: "SELECT mode,version FROM learning_pins WHERE owner_id=?", args: [owner] });
   const snapshots = await db.execute({
-    sql: "SELECT mode, MAX(version) AS version FROM learning_profiles WHERE owner_id=? GROUP BY mode",
+    sql: "SELECT mode, COUNT(*) AS version FROM learning_profiles WHERE owner_id=? AND event_count>0 GROUP BY mode",
     args: [owner],
   });
   return {
@@ -208,7 +211,7 @@ export async function learningContext(owner: string, mode: LearningMode): Promis
 export async function restorePreviousLearningProfile(owner: string, mode: LearningMode) {
   const db = await ready();
   const latest = await db.execute({
-    sql: "SELECT version, event_count, profile_json FROM learning_profiles WHERE owner_id=? AND mode=? ORDER BY version DESC LIMIT 2",
+    sql: "SELECT version, event_count, profile_json FROM learning_profiles WHERE owner_id=? AND mode=? AND event_count>0 ORDER BY version DESC LIMIT 2",
     args: [owner, mode],
   });
   if (latest.rows.length < 2) throw new Error("NO_OLDER_PROFILE");
