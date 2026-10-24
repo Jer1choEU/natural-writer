@@ -621,7 +621,7 @@ async function evaluateQuality(
     );
     return {
       quality: result,
-      score: result.overall * 0.6 + result.fidelity * 0.2 + result.semanticPrecision * 0.2,
+      score: result.overall, // Final scoring is calculated by assessEditorialCandidate.
     };
   } catch {
     // An unavailable judge must not make the editor unusable.
@@ -752,24 +752,88 @@ export async function humanizeText(text: string, options: HumanizeOptions) {
       ...candidate,
       index: candidateOrder[index],
       initialRank: index,
-      score: assessments[index].score,
       quality: assessments[index].quality,
+      assessment: assessEditorialCandidate(
+        text, candidate.text, candidate.semanticGuardPassed, assessments[index].quality
+      ),
     }))
     .sort((a, b) => {
-      if (a.semanticGuardPassed !== b.semanticGuardPassed) return a.semanticGuardPassed ? -1 : 1;
-      if (a.score !== null && b.score !== null && a.score !== b.score) return b.score - a.score;
+      if (a.assessment.eligible !== b.assessment.eligible) {
+        return a.assessment.eligible ? -1 : 1;
+      }
+      if (a.assessment.score !== null && b.assessment.score !== null &&
+          a.assessment.score !== b.assessment.score) {
+        return b.assessment.score - a.assessment.score;
+      }
       return a.initialRank - b.initialRank;
     });
-  const first = ranked[0];
-  if (!first) throw new Error("Nessuna riscrittura generata.");
+  if (!ranked.length) throw new Error("Nessuna riscrittura generata.");
+  const viable = ranked.filter((candidate) => candidate.assessment.eligible);
+  // Never pass off a judged unfaithful or artificial rewrite as an improvement.
+  const noSafeImprovement = viable.length === 0;
+  const first = viable[0] || {
+    ...ranked[0],
+    text,
+    finalSimilarity: 1,
+    depthRepairApplied: false,
+    semanticGuardPassed: true,
+    semanticIssues: 0,
+    quality: null,
+    assessment: { eligible: true, score: null, reason: "judge-unavailable" as const },
+  };
 
-  // Choose a useful alternative, not another nearly identical copy.
-  const others = ranked.slice(1);
-  const distinct = others.find((candidate) =>
-    surfaceSimilarity(first.text, candidate.text) < 0.72 &&
-    (candidate.score === null || first.score === null || candidate.score >= first.score - 1.5)
+  let second = viable.slice(1).find((candidate) =>
+    sufficientlyDistinct(
+      surfaceSimilarity(first.text, candidate.text),
+      candidate.assessment.score, first.assessment.score
+    )
   );
-  const second = distinct || others[0];
+
+  // One focused attempt if candidates are near-duplicates, never a fake A/B.
+  // Failure of this optional path must not break the successful first rewrite.
+  if (options.returnAlternatives && !second && !noSafeImprovement && wordCount > 60) {
+    try {
+      const contrastiveDraft = await generateText(
+        [
+          "Proponi una seconda versione editorialmente diversa dalla prima, ma fedele.",
+          "Ricomponi periodi e paragrafi: cambia la costruzione, non le posizioni o i fatti.",
+          "Evita sinonimi decorativi, metafore, personificazioni e frasi ad effetto.",
+          "Conserva tutte le informazioni, le attribuzioni e il grado di certezza.",
+          "Non peggiorare frasi già naturali solo per produrre differenza.",
+          modeRules(options), getPresetRules(options.preset), buildPreferenceRules(options),
+          "Restituisci solo la seconda versione finale.",
+        ].join("\n"),
+        [
+          "ORIGINALE:", text, "OSSATURA SEMANTICA:", semanticSkeleton,
+          "PRIMA VERSIONE DA DIFFERENZIARE:", first.text,
+        ].join("\n\n"),
+        selectedModel
+      );
+      const contrasted = await finalizeDraft(
+        text, semanticSkeleton, contrastiveDraft,
+        surfaceSimilarity(text, contrastiveDraft), options, selectedModel, knowledgeContext
+      );
+      const judged = await evaluateQuality(text, contrasted, options);
+      const assessed = assessEditorialCandidate(
+        text, contrasted.text, contrasted.semanticGuardPassed, judged.quality
+      );
+      if (assessed.eligible && sufficientlyDistinct(
+        surfaceSimilarity(first.text, contrasted.text),
+        assessed.score, first.assessment.score
+      )) {
+        second = {
+          ...contrasted,
+          index: 1,
+          initialRank: ranked.length,
+          quality: judged.quality,
+          assessment: assessed,
+        };
+      }
+    } catch (error) {
+      console.warn("Optional contrastive alternative unavailable", error);
+    }
+  }
+
   const chosen = options.returnAlternatives && second ? [first, second] : [first];
 
   const alternatives = options.returnAlternatives
@@ -778,7 +842,7 @@ export async function humanizeText(text: string, options: HumanizeOptions) {
         text: candidate.text,
         similarity: candidate.finalSimilarity,
         strategy: strategies[candidate.index].id,
-        qualityScore: candidate.score === null ? null : Number(candidate.score.toFixed(2)),
+        qualityScore: candidate.assessment.score === null ? null : Number(candidate.assessment.score.toFixed(2)),
         semanticGuardPassed: candidate.semanticGuardPassed,
       }))
     : undefined;
@@ -793,6 +857,8 @@ export async function humanizeText(text: string, options: HumanizeOptions) {
     "quality-ranking",
   ];
   if (chosen.some((candidate) => candidate.depthRepairApplied)) stages.push("targeted-repair");
+  if (noSafeImprovement) stages.push("safe-original-fallback");
+  if (second && second.initialRank === ranked.length) stages.push("contrastive-alternative");
   if (options.preferenceExamples?.length) stages.push("preference-conditioning");
   if (options.preferenceProfile?.sampleCount) stages.push("style-profile-conditioning");
   if (options.politicalStyle && m5sKnowledge.matches.length) stages.push("m5s-knowledge-conditioning");
@@ -811,7 +877,7 @@ export async function humanizeText(text: string, options: HumanizeOptions) {
       finalSurfaceSimilarity: first.finalSimilarity,
       depthRepairApplied: first.depthRepairApplied,
       semanticGuardPassed: first.semanticGuardPassed,
-      qualityScore: first.score,
+      qualityScore: first.assessment.score,
       preferenceExamplesUsed: Math.min(options.preferenceExamples?.length || 0, 3),
       preferenceSamplesProfiled: options.preferenceProfile?.sampleCount || 0,
       preferenceProfile: options.preferenceProfile || null,
