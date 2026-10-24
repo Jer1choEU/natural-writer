@@ -169,6 +169,7 @@ export async function getLearningStatus(owner: string) {
     imports: number(counts.rows[0]?.imports),
     versions: Object.fromEntries(snapshots.rows.map(row => [String(row.mode), number(row.version)])),
     pinned: Object.fromEntries(pins.rows.map(row => [String(row.mode), number(row.version)])),
+    backupConfigured: Boolean(process.env.CRON_SECRET && (process.env.BLOB_READ_WRITE_TOKEN || process.env.BLOB_STORE_ID)),
   };
 }
 
@@ -234,11 +235,13 @@ export async function exportLearning(owner: string) {
     sql: "SELECT mode,version,event_count,profile_json,created_at FROM learning_profiles WHERE owner_id=? ORDER BY mode, version",
     args: [owner],
   });
+  const pins = await db.execute({ sql: "SELECT mode,version FROM learning_pins WHERE owner_id=?", args: [owner] });
   return {
     format: "natural-writer-learning-v1",
     exportedAt: new Date().toISOString(),
     events: events.rows,
     profiles: profiles.rows,
+    pinnedVersions: pins.rows,
   };
 }
 
