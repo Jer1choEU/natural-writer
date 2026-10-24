@@ -281,6 +281,8 @@ const verificationRules = [
   "Per CIASCUN id registra status: preserved, partial, omitted, altered, contradicted.",
   "Preserved SOLO se attribuzione, azione, destinatari, quantità, variazione, certezza, condizioni, negazioni e intensità sono equivalenti.",
   "Una frase che contiene parole simili ma cambia intenzione o intensità è altered, non preserved.",
+  "In testi politici, distinguere sempre una gerarchia di priorità da un divieto, da un obbligo o da una condizione normativa: trasformare 'occupano un rango inferiore' in 'l'Unione impone di subordinare l'impiego' può alterare la tesi.",
+  "Non equiparare automaticamente preferenze comparative o posizioni subordinate a un danno causato 'a discapito' dell'alternativa.",
   "Un contenuto perso anche parzialmente è partial oppure omitted. Controlla anche azioni politiche implicite e direzioni di variazione.",
   "Individua affermazioni aggiunte non deducibili dall'originale, incluse premesse, slogan e causalità inventate.",
   "Restituisci SOLO JSON {checks:[{id,status,explanation,targetExcerpt}],addedClaims:[string]}.",
