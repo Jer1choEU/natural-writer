@@ -13,25 +13,12 @@ Principi:
 - adattare il testo al contesto e al pubblico;
 - trasformare direttamente un testo in un post social pronto all'uso.
 
-## Modalità
-- **Naturale** — riscrittura equilibrata e scorrevole.
-- **Professionale** — più chiara, ordinata e adatta a contesti di lavoro.
-- **Social post** — adatta il contenuto a un social network.
+## Modalità dell'interfaccia
 
-### Social post
-Piattaforme:
-- Instagram
-- Facebook
-- LinkedIn
-- X
-- Threads
+- **Social** — riscrittura pensata per i contenuti social, diretta e leggibile.
+- **Naturale** — riscrittura scorrevole, senza adattamento ai formati social.
 
-Parametri:
-- tono;
-- intensità della riscrittura;
-- emoji sì/no;
-- call to action sì/no;
-- domanda finale sì/no.
+L'interfaccia offre soltanto queste due modalità: non mostra intensità, preset o impostazioni avanzate. Il motore applica automaticamente uno stile coerente con la comunicazione M5S in entrambe le modalità, preservando opinioni e informazioni originali. Il controllo di coerenza politica non compare più nell'interfaccia (la relativa API interna rimane disponibile nel codice).
 
 ## Humanization Engine
 
@@ -97,7 +84,7 @@ Poi apri `http://localhost:3000`.
 
 ## Stato
 
-🟡 **Beta interna funzionale.** Riscrittura, confronto A/B, training stilistico aggregato, benchmark, knowledge base M5S e controllo di coerenza politica sono operativi. Per il deploy serve `GEMINI_API_KEY`; la principale lacuna infrastrutturale rimasta è la persistenza del training tra dispositivi.
+🟡 **Beta interna funzionale.** Riscrittura con due modalità, confronto A/B, training stilistico aggregato, benchmark e knowledge base M5S sono operativi. Per il deploy serve `GEMINI_API_KEY`; la principale lacuna infrastrutturale rimasta è la persistenza del training tra dispositivi.
 
 
 ## Regole qualitative
@@ -116,11 +103,9 @@ Natural Writer non si limita a parafrasare. Il motore cerca di ridurre alcuni pa
 - ripetizioni semantiche;
 - hook, CTA e domande finali inseriti meccanicamente nei post social.
 
-### Intensità
+### Profondità interna di riscrittura
 
-- **Leggera**: corregge soprattutto rigidità e ripetizioni, mantenendo struttura e lessico il più possibile.
-- **Media**: modifica ritmo e sintassi con libertà moderata.
-- **Profonda**: può ristrutturare periodi e paragrafi, mantenendo invariati significato e fatti.
+Il motore mantiene una profondità tecnica di default senza esporre alcun selettore di intensità all’utente. I vecchi parametri possono ancora essere usati dai benchmark interni.
 
 ### Controllo di fedeltà
 
@@ -225,11 +210,15 @@ Il judge usa `GEMINI_JUDGE_MODEL` (default: `gemini-3.5-flash-lite`) e viene imp
 - Scelta di alternative A/B diverse quando la qualità lo permette.
 - Editor delle alternative modificabile e riformulazione del solo passaggio selezionato.
 - Il training A/B memorizza anche la versione modificata manualmente prima della scelta.
-- Interfaccia per modalità, intensità, tono, preset, piattaforma, termini bloccati e opzioni social.
-- Stile M5S applicato solo quando viene esplicitamente selezionato.
+- Interfaccia semplificata con due sole modalità: Social e Naturale.
+- Stile M5S automatico e attivo di default in entrambe le modalità.
 - Metriche italiane: Gulpease, diversità lessicale, variazione dei periodi, densità di punteggiatura e formule ricorrenti.
 - Nuovo workflow Quality checks. Verifica gratuita: npm run quality-check, npm run typecheck, npm run build.
 
 ### Limiti e costi
 
 Il controllo semantico deterministico non può garantire da solo l'equivalenza di tutte le affermazioni. I punteggi automatici non sono una misura certa della paternità umana. La pipeline usa più chiamate a Gemini (incluso il Judge, quando disponibile), quindi testo, intensità e numero di candidate incidono sulla quota. Manca ancora un grande benchmark italiano con valutazioni umane indipendenti. Il training resta locale al browser, senza sincronizzazione tra dispositivi.
+
+## Prossimo sviluppo in coda
+
+Training persistente e Auto-Learning controllato: vedere https://github.com/Jer1choEU/natural-writer/issues/3. Non ancora implementato: nessun database di training o processo automatico viene attivato da questo aggiornamento.
