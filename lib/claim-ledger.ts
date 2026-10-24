@@ -77,7 +77,7 @@ export function sourceChunks(original: string, limit = 3600): string[] {
   return chunks.filter(Boolean);
 }
 
-async function structuredGemini<T>(
+export async function structuredGemini<T>(
   model: string, instructions: string, data: string,
 ): Promise<T> {
   const apiKey = process.env.GEMINI_API_KEY;
