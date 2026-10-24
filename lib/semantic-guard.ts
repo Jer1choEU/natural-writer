@@ -1,5 +1,5 @@
 export type SemanticIssue = {
-  type: "number" | "quotation" | "protected-term" | "acronym";
+  type: "number" | "quotation" | "protected-term" | "acronym" | "scope";
   value: string;
   message: string;
 };
@@ -43,6 +43,52 @@ const differences = (original: string[], rewritten: string[]) => {
   return { missing, extra: remaining };
 };
 
+
+/**
+ * High-confidence Italian shifts of scope or intensity. This is intentionally
+ * narrow: approximate semantic alignment and synonyms belong to the AI judge,
+ * while a deterministic guard should only block well-defined regressions.
+ */
+const scopeRegressions: Array<{
+  source: RegExp;
+  target: RegExp;
+  label: string;
+}> = [
+  {
+    source: /\b(?:limitare|limitando|ridurre|riducendo)\s+(?:il\s+)?consumo\s+di\s+suolo\b/u,
+    target: /\b(?:arrestare|azzerare|eliminare)\s+(?:(?:del tutto|completamente)\s+)?(?:il\s+)?consumo\s+di\s+suolo\b/u,
+    label: "Limitare il consumo di suolo non equivale ad arrestarlo o azzerarlo",
+  },
+  {
+    source: /\b(?:riduzione|ridurre)\s+(?:delle|le)\s+liste\s+d'attesa\b/u,
+    target: /\b(?:abbattere|azzerare|eliminare)\s+(?:completamente\s+)?le\s+liste\s+d'attesa\b/u,
+    label: "Ridurre le liste d'attesa non autorizza ad abbatterle o eliminarle",
+  },
+  {
+    source: /\btrasparenza\s+delle\s+istituzioni\b/u,
+    target: /\bmassima\s+trasparenza\s+delle\s+istituzioni\b/u,
+    label: "Trasparenza non significa automaticamente massima trasparenza",
+  },
+  {
+    source: /\bmaggiore\s+autonomia\s+diplomatica\b/u,
+    target: /\britrovare\s+(?:una?\s+)?autonomia\s+diplomatica\b/u,
+    label: "Maggiore autonomia non implica un'autonomia precedente perduta",
+  },
+  {
+    source: /\b(?:privilegiando|privilegia|preferisce)\b.{0,135}\brispetto\s+all'aumento\s+delle\s+spese\s+militari\b/u,
+    target: /\b(?:opponendosi|opporsi|si oppone)\b.{0,80}\ball'aumento\s+delle\s+spese\s+militari\b/u,
+    label: "Preferire il dialogo all'aumento delle spese non implica opposizione categorica",
+  },
+];
+
+function scopeShiftIssues(original: string, rewritten: string): string[] {
+  const source = normalize(original);
+  const target = normalize(rewritten);
+  return scopeRegressions
+    .filter((rule) => rule.source.test(source) && rule.target.test(target) && !rule.target.test(source))
+    .map((rule) => rule.label);
+}
+
 export function checkSemanticGuard(
   original: string,
   rewritten: string,
@@ -80,6 +126,8 @@ export function checkSemanticGuard(
       add("acronym", acronym, "Sigla originale modificata o rimossa");
     }
   }
+
+  scopeShiftIssues(original, rewritten).forEach((value) => add("scope", value, "Rafforzamento o cambiamento di ambito della proposta"));
 
   return { valid: issues.length === 0, issues };
 }
