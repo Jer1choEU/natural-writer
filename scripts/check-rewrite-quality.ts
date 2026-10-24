@@ -44,8 +44,10 @@ check(!unnatural.eligible && unnatural.reason === "naturalness", "Artificial out
 
 check(!assessEditorialCandidate(original, good, false, quality).eligible,
   "A deterministic semantic guard failure is always disqualifying");
-check(assessEditorialCandidate(original, good, true, null).eligible,
-  "Unavailable Gemini judge must not disable the editor");
+check(!assessEditorialCandidate(original, good, true, null).eligible,
+  "Missing quality judgment cannot establish editorial improvement");
+check(!assessEditorialCandidate(original, good, true, { ...quality, editorialGain: 5 }).eligible,
+  "An unchanged or cosmetic rewrite is not an editorial improvement");
 
 check(introducedCliches(original, poor) === 1, "Detect new formulaic expressions");
 const penalized = assessEditorialCandidate(original, poor, true, quality);
