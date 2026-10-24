@@ -156,52 +156,53 @@ rejects(() => parseEditorialPlan({
 
 async function mockNetworkPipeline() {
   const fetchBefore = globalThis.fetch;
-  const keyBefore = process.env.GEMINI_API_KEY;
+  const keyBefore = process.env.ANTHROPIC_API_KEY;
   const source = "Il gruppo chiede più fondi.";
   const rewrite = "Più fondi sono richiesti dal gruppo.";
   const rawLedger = { claims: [claimFor(source)] };
   let responses: unknown[] = [];
   let count = 0;
   try {
-    process.env.GEMINI_API_KEY = "test-only-not-a-secret";
+    process.env.ANTHROPIC_API_KEY = "test-only-not-a-secret";
     globalThis.fetch = (async () => {
       count++;
       const body = responses.shift();
       if (!body) return new Response("unavailable", { status: 503 });
       return new Response(JSON.stringify({
-        candidates: [{ content: { parts: [{ text: JSON.stringify(body) }] } }],
+        stop_reason: "end_turn",
+        content: [{ type: "text", text: JSON.stringify(body) }],
       }), { status: 200, headers: { "Content-Type": "application/json" } });
     }) as typeof fetch;
     responses = [{ claims: [{ source, subject: "gruppo", action: "chiede", conditions: "invalid" }] }, rawLedger];
-    const retryLedger = await extractClaimLedger(source, "gemini-3.5-flash-lite");
+    const retryLedger = await extractClaimLedger(source, "claude-haiku-5-5");
     assert(retryLedger.claims.length === 1, "Malformed extracted metadata must trigger one safe retry");
     responses = [
       { claims: [{ source: "Invented text", subject: "wrong", action: "invent" }] },
       { claims: [{ source: "Invented text", subject: "wrong", action: "invent" }] },
     ];
-    const sourceFallback = await extractClaimLedger(source, "gemini-3.5-flash-lite");
+    const sourceFallback = await extractClaimLedger(source, "claude-haiku-5-5");
     assert(sourceFallback.claims.length === 1 && sourceFallback.claims[0].source === source,
       "Two malformed model extractions must retain anchored source sentences");
     responses = [rawLedger];
-    const ledger = await extractClaimLedger(source, "gemini-3.5-flash-lite");
+    const ledger = await extractClaimLedger(source, "claude-haiku-5-5");
     assert(ledger.claims.length === 1, "Network extraction must produce source-anchored claims");
     responses = [{
       checks: [{ id: "C1", status: "preserved", explanation: "", targetExcerpt: "" }],
       addedClaims: [],
     }];
-    const safe = await verifyAndRepair(source, rewrite, ledger, "gemini-3.5-flash-lite");
+    const safe = await verifyAndRepair(source, rewrite, ledger, "claude-haiku-5-5");
     assert(safe.validated && safe.text === rewrite, "Verified semantic rewrite must pass");
     responses = [{
       checks: [{ id: "C1", status: "omitted", explanation: "Proposta omessa", targetExcerpt: "" }],
       addedClaims: [],
     }];
-    const unsafe = await verifyAndRepair(source, "Il gruppo ha parlato.", ledger, "gemini-3.5-flash-lite");
+    const unsafe = await verifyAndRepair(source, "Il gruppo ha parlato.", ledger, "claude-haiku-5-5");
     assert(!unsafe.validated && unsafe.text === source, "Unrepairable omitted claim must retain source");
     responses = [{
       checks: [{ id: "C1", status: "preserved", explanation: "", targetExcerpt: "" }],
       addedClaims: ["Nessun dettaglio è confermato"],
     }];
-    const invented = await verifyAndRepair(source, "Il gruppo chiede più fondi, che sono stati approvati.", ledger, "gemini-3.5-flash-lite");
+    const invented = await verifyAndRepair(source, "Il gruppo chiede più fondi, che sono stati approvati.", ledger, "claude-haiku-5-5");
     assert(!invented.validated && invented.text === source, "Additional claims must retain source");
     responses = [{
       checks: [{ id: "C1", status: "altered", explanation: "Quantità invertita", targetExcerpt: "meno fondi" }],
@@ -210,21 +211,21 @@ async function mockNetworkPipeline() {
       checks: [{ id: "C1", status: "preserved", explanation: "", targetExcerpt: "" }],
       addedClaims: [],
     }];
-    const corrected = await verifyAndRepair(source, "Il gruppo chiede meno fondi.", ledger, "gemini-3.5-flash-lite");
+    const corrected = await verifyAndRepair(source, "Il gruppo chiede meno fondi.", ledger, "claude-haiku-5-5");
     assert(corrected.validated && corrected.repaired &&
       corrected.text === "Il gruppo chiede maggiori finanziamenti.",
       "Unique excerpt correction must be rechecked and kept");
     // A failed model response must never be interpreted as a passed verifier.
     responses = [];
-    const failing = await verifyAndRepair(source, rewrite, ledger, "gemini-3.5-flash-lite");
+    const failing = await verifyAndRepair(source, rewrite, ledger, "claude-haiku-5-5");
     assert(!failing.validated && failing.text === source, "Model outage must retain source");
-    assert(count >= 7, "Mocked Gemini calls were not performed");
+    assert(count >= 7, "Mocked Claude calls were not performed");
   } finally {
     globalThis.fetch = fetchBefore;
-    if (keyBefore === undefined) delete process.env.GEMINI_API_KEY;
-    else process.env.GEMINI_API_KEY = keyBefore;
+    if (keyBefore === undefined) delete process.env.ANTHROPIC_API_KEY;
+    else process.env.ANTHROPIC_API_KEY = keyBefore;
   }
 }
 mockNetworkPipeline()
-  .then(() => console.log("Claim ledger 30 fixtures, editorial plan and mocked Gemini pipeline: OK"))
+  .then(() => console.log("Claim ledger 30 fixtures, editorial plan and mocked Claude pipeline: OK"))
   .catch((error) => { console.error(error); process.exitCode = 1; });
