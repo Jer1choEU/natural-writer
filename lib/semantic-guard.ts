@@ -60,9 +60,10 @@ export function checkSemanticGuard(
   numberDiff.extra.forEach((value) => add("number", value, "Numero non presente nell'originale"));
 
   const originalQuotes = quoted(original);
+  const rewrittenQuotes = quoted(rewritten);
   const outputNormalized = normalize(rewritten);
   originalQuotes.forEach((value) => {
-    if (!outputNormalized.includes(value)) {
+    if (rewrittenQuotes.length ? !rewrittenQuotes.includes(value) : !outputNormalized.includes(value)) {
       add("quotation", value, "Citazione originale non conservata letteralmente");
     }
   });
