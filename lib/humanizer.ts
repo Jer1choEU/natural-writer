@@ -1,3 +1,4 @@
+import { generateClaudeText, defaultClaudeModel, defaultClaudeSemanticModel } from "@/lib/claude";
 import { getPresetRules, type StylePreset } from "@/lib/style-presets";
 import { extractClaimLedger, verifyAndRepair } from "@/lib/claim-ledger";
 import { planEditorialRevision } from "@/lib/editorial-plan";
@@ -39,7 +40,7 @@ export type HumanizeOptions = {
   politicalStyle?: boolean;
 };
 
-const defaultModel = process.env.GEMINI_MODEL || "gemini-3.5-flash-lite";
+const defaultModel = defaultClaudeModel;
 
 const antiTicRules = [
   "Evita aperture generiche come 'nel mondo di oggi', 'in un contesto in continua evoluzione', 'è importante sottolineare'.",
@@ -449,81 +450,7 @@ function buildReviewInstructions(options: HumanizeOptions) {
 }
 
 
-function getRetryDelayMs(status: number, errorText: string, attempt: number) {
-  const exponentialDelay = 1000 * 2 ** (attempt - 1);
-  if (status !== 429) return exponentialDelay;
-
-  const retryMatch =
-    errorText.match(/retry in\s+([0-9.]+)s/i) ||
-    errorText.match(/"retryDelay"\s*:\s*"([0-9.]+)s"/i);
-
-  const suggestedSeconds = retryMatch ? Number(retryMatch[1]) : 0;
-  if (!Number.isFinite(suggestedSeconds) || suggestedSeconds <= 0) {
-    return Math.max(exponentialDelay, 10000);
-  }
-
-  return Math.max(exponentialDelay, Math.ceil(suggestedSeconds * 1000) + 750);
-}
-
-async function generateText(instructions: string, input: string, selectedModel: string) {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    throw new Error("GEMINI_API_KEY non configurata");
-  }
-
-  const maxAttempts = 4;
-  let lastError: Error | null = null;
-
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent?key=${encodeURIComponent(apiKey)}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-         signal: AbortSignal.timeout(30000),
-        body: JSON.stringify({
-          systemInstruction: {
-            parts: [{ text: instructions }],
-          },
-          contents: [
-            {
-              role: "user",
-              parts: [{ text: input }],
-            },
-          ],
-        }),
-      }
-    );
-
-    if (response.ok) {
-      const data = await response.json();
-      const text =
-        data?.candidates?.[0]?.content?.parts
-          ?.map((part: { text?: string }) => part.text || "")
-          .join("")
-          .trim() || "";
-
-      if (!text) {
-        throw new Error("Gemini non ha restituito testo.");
-      }
-
-      return text;
-    }
-
-    const errorText = await response.text();
-    lastError = new Error(`Gemini API error ${response.status}: ${errorText}`);
-
-    if (![429, 500, 502, 503, 504].includes(response.status) || attempt === maxAttempts) {
-      throw lastError;
-    }
-
-    const delayMs = getRetryDelayMs(response.status, errorText, attempt);
-    await new Promise((resolve) => setTimeout(resolve, delayMs));
-  }
-
-  throw lastError || new Error("Gemini API error sconosciuto");
-}
-
+const generateText = generateClaudeText;
 
 type FinalizedCandidate = {
   text: string;
@@ -682,7 +609,7 @@ export async function rewriteFragment(
   );
   const guard = checkSemanticGuard(fragment, candidate.trim(), locked);
   if (!guard.valid) return fragment;
-  const semanticModel = process.env.GEMINI_SEMANTIC_MODEL || process.env.GEMINI_JUDGE_MODEL || model;
+  const semanticModel = defaultClaudeSemanticModel;
   try {
     const ledger = await extractClaimLedger(fragment, semanticModel);
     const result = await verifyAndRepair(fragment, candidate.trim(), ledger, semanticModel, locked);
@@ -702,7 +629,7 @@ export async function humanizeText(text: string, options: HumanizeOptions) {
   };
 
 
-  const semanticModel = process.env.GEMINI_SEMANTIC_MODEL || process.env.GEMINI_JUDGE_MODEL || selectedModel;
+  const semanticModel = defaultClaudeSemanticModel;
   // The ledger is mandatory: never certify a draft when claim extraction fails.
   const ledger = await extractClaimLedger(text, semanticModel).catch((error) => {
     console.warn("Claim extraction unavailable; retaining source", error instanceof Error ? error.message : "unknown");
@@ -716,7 +643,7 @@ export async function humanizeText(text: string, options: HumanizeOptions) {
         qualityScore: null, semanticGuardPassed: true, claimValidated: false,
       }] : undefined,
       meta: {
-        provider: "gemini", model: selectedModel, stages: ["claim-ledger-unavailable", "safe-original-fallback"],
+        provider: "anthropic", model: selectedModel, stages: ["claim-ledger-unavailable", "safe-original-fallback"],
         claimCount: 0, claimVerificationStatus: "not-verified",
         semanticGuardPassed: true, qualityScore: null, alternativesReturned: 1,
         mode: options.mode, intensity: options.intensity || "media",
@@ -959,7 +886,7 @@ export async function humanizeText(text: string, options: HumanizeOptions) {
     text: first.text,
     alternatives,
     meta: {
-      provider: "gemini",
+      provider: "anthropic",
       model: selectedModel,
       stages,
       candidates: drafts.length,
