@@ -470,6 +470,7 @@ export default function Home() {
                     <textarea
                       aria-label={"Versione " + (index === 0 ? "A" : "B") + " modificabile"}
                       value={alternative.text}
+                      readOnly={fragmentBusyIndex === index || selectedIndex !== null}
                       onChange={(event) => updateAlternative(index, event.target.value)}
                       onSelect={(event) => {
                         const start = event.currentTarget.selectionStart;
@@ -489,7 +490,7 @@ export default function Home() {
                     {alternatives.length >= 2 && (
                       <button
                         className="choiceButton"
-                        disabled={selectedIndex !== null}
+                        disabled={selectedIndex !== null || fragmentBusyIndex !== null}
                         onClick={() => choosePreference(index)}
                       >
                         {selected
