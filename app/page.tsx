@@ -349,6 +349,69 @@ export default function Home() {
         </div>
 
         <aside className="controls">
+          <div className="quickOptions">
+            <label className="settingField">Modalità
+              <select value={mode} onChange={(event) => setMode(event.target.value as typeof mode)}>
+                <option value="social">Social</option>
+                <option value="natural">Naturale</option>
+                <option value="professional">Professionale</option>
+              </select>
+            </label>
+            <label className="settingField">Intensità
+              <select value={intensity} onChange={(event) => setIntensity(event.target.value as typeof intensity)}>
+                <option value="leggera">Leggera</option>
+                <option value="media">Media</option>
+                <option value="profonda">Profonda</option>
+              </select>
+            </label>
+          </div>
+          <details className="editorSettings">
+            <summary>Impostazioni avanzate</summary>
+            <label className="settingField">Preset
+              <select value={preset} onChange={(event) => setPreset(event.target.value as StylePreset)}>
+                {Object.entries(STYLE_PRESETS).map(([key, value]) => (
+                  <option key={key} value={key}>{value.label}</option>
+                ))}
+              </select>
+            </label>
+            <label className="settingField">Tono
+              <select value={tone} onChange={(event) => setTone(event.target.value)}>
+                <option value="diretto">Diretto</option>
+                <option value="conversazionale">Conversazionale</option>
+                <option value="misurato">Misurato</option>
+                <option value="formale">Formale</option>
+                <option value="coinvolgente">Coinvolgente</option>
+              </select>
+            </label>
+            {mode === "social" && (
+              <label className="settingField">Piattaforma
+                <select value={platform} onChange={(event) => setPlatform(event.target.value as typeof platform)}>
+                  <option value="facebook">Facebook</option>
+                  <option value="instagram">Instagram</option>
+                  <option value="linkedin">LinkedIn</option>
+                  <option value="x">X</option>
+                  <option value="threads">Threads</option>
+                </select>
+              </label>
+            )}
+            <label className="settingField">Termini da proteggere
+              <textarea className="protectedTerms" value={lockedTermsInput}
+                onChange={(event) => setLockedTermsInput(event.target.value)}
+                placeholder="Uno per riga (max 20)" />
+            </label>
+            <label className="settingCheck"><input type="checkbox" checked={politicalStyle}
+              onChange={(event) => setPoliticalStyle(event.target.checked)} /> Stile M5S</label>
+            {mode === "social" && (
+              <>
+                <label className="settingCheck"><input type="checkbox" checked={emoji}
+                  onChange={(event) => setEmoji(event.target.checked)} /> Aggiungi emoji se utili</label>
+                <label className="settingCheck"><input type="checkbox" checked={cta}
+                  onChange={(event) => setCta(event.target.checked)} /> Call to action</label>
+                <label className="settingCheck"><input type="checkbox" checked={question}
+                  onChange={(event) => setQuestion(event.target.checked)} /> Domanda finale</label>
+              </>
+            )}
+          </details>
           <button className="primary" disabled={!canTransform} onClick={transform}>
             {loading ? "Sto creando A/B..." : "Trasforma"}
           </button>
@@ -362,6 +425,7 @@ export default function Home() {
           <p className="hint">La riscrittura genera due versioni. Il controllo politico è separato e non modifica il testo.</p>
           {error && <p className="error">{error}</p>}
           {politicalError && <p className="error">{politicalError}</p>}
+          {fragmentError && <p className="error">{fragmentError}</p>}
         </aside>
 
         <div className="panel resultPanel">
@@ -403,7 +467,24 @@ export default function Home() {
                       </button>
                     </div>
 
-                    <textarea value={alternative.text} readOnly />
+                    <textarea
+                      aria-label={"Versione " + (index === 0 ? "A" : "B") + " modificabile"}
+                      value={alternative.text}
+                      onChange={(event) => updateAlternative(index, event.target.value)}
+                      onSelect={(event) => {
+                        const start = event.currentTarget.selectionStart;
+                        const end = event.currentTarget.selectionEnd;
+                        if (end > start) setSelectedFragment({ index, start, end });
+                      }}
+                    />
+                    <div className="fragmentToolbar">
+                      <span>Modifica il testo o seleziona un passaggio</span>
+                      <button className="copy" disabled={loading || fragmentBusyIndex !== null ||
+                        selectedIndex !== null || selectedFragment?.index !== index}
+                        onClick={() => rewriteSelection(index)}>
+                        {fragmentBusyIndex === index ? "Riscrittura..." : "Riformula selezione"}
+                      </button>
+                    </div>
 
                     {alternatives.length >= 2 && (
                       <button
