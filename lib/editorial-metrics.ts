@@ -17,6 +17,9 @@ const artificialPhrases = [
   "risulta fondamentale",
   "in conclusione",
   "un ruolo cruciale",
+  "gioca un ruolo chiave",
+  "una priorità fondamentale",
+  "sul terreno della",
   "non solo",
   "ma anche",
 ];
