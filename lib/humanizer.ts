@@ -468,6 +468,7 @@ async function generateText(instructions: string, input: string, selectedModel: 
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+         signal: AbortSignal.timeout(30000),
         body: JSON.stringify({
           systemInstruction: {
             parts: [{ text: instructions }],
