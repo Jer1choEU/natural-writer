@@ -273,3 +273,38 @@ textarea::placeholder { color: #59616d; }
   .controls { width: min(440px, 100%); }
   .resultPanel { order: 3; }
 }
+
+
+/* Persistent memory dashboard. Main writing UI remains two-mode only. */
+.learningPage { width:min(980px,calc(100% - 30px)); margin:0 auto; padding:32px 0 64px; }
+.learningHeader { display:flex; justify-content:space-between; gap:18px; align-items:flex-start; margin-bottom:24px; }
+.learningHeader h1 { font-size:1.65rem; margin:0 0 8px; }
+.learningHeader p { margin:0; color:#9ba5b2; line-height:1.5; }
+.learningHeader a,.learningCard a { color:#a6b4ff; }
+.learningCard { padding:22px; border:1px solid #303640; border-radius:16px; background:#15191f; margin-bottom:16px; display:flex; flex-direction:column; gap:14px; }
+.learningCard h2 { font-size:1.12rem; margin:0; }
+.learningCard p { margin:0; color:#acb4bf; line-height:1.6; }
+.learningCard label:not(.learningCheckbox):not(.learningToggle) { color:#cbd1da; display:flex; flex-direction:column; gap:8px; }
+.learningCard select { width:100%; max-width:260px; border:1px solid #39414d; background:#191d24; color:#eee; border-radius:9px; padding:9px; }
+.learningCard textarea { flex:initial; min-height:170px; resize:vertical; padding:14px; border:1px solid #39414d; border-radius:9px; background:#101318; }
+.learningCard button { border:1px solid #39414d; color:#e6e9ee; background:#242a32; padding:10px 13px; border-radius:9px; font-weight:650; }
+.learningCard button.primary { border:0; background:#7487ff; }
+.learningRow { display:flex; justify-content:space-between; align-items:center; gap:22px; }
+.learningRow div { display:flex; flex-direction:column; gap:8px; }
+.learningToggle,.learningCheckbox { display:flex; gap:8px; align-items:center; cursor:pointer; color:#d0d5dc; }
+.learningToggle input,.learningCheckbox input { accent-color:#7487ff; width:18px; height:18px; flex-shrink:0; }
+.learningStats { display:grid; grid-template-columns:repeat(4,1fr); gap:9px; }
+.learningStats span { border:1px solid #303640; background:#0d1116; padding:10px; border-radius:9px; display:flex; flex-direction:column; font-size:.78rem; color:#929eae; gap:3px; }
+.learningStats strong { font-size:1.35rem; color:#e4e8ed; }
+.learningActions { display:flex; flex-wrap:wrap; align-items:center; gap:9px; }
+.learningActions .learningAction { border:1px solid #46536d; padding:10px 13px; border-radius:9px; text-decoration:none; }
+.learningActions .learningDelete { color:#ffabab; border-color:#73454a; }
+.learningMessage { color:#e7dfb5; border:1px solid #645938; border-radius:10px; padding:10px 14px; }
+.trainingBar .memoryLink { color:#a6b4ff; text-decoration:none; white-space:nowrap; margin-left:auto; }
+.trainingBar .memoryLink:hover { text-decoration:underline; }
+@media(max-width:670px) {
+  .learningHeader,.learningRow { flex-direction:column; align-items:stretch; }
+  .learningStats { grid-template-columns:repeat(2,1fr); }
+  .learningCard { padding:16px; }
+  .trainingBar { flex-wrap:wrap; }
+}
