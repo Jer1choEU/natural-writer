@@ -9,6 +9,7 @@ type Status = {
   imports: number;
   versions: Record<string, number>;
   pinned: Record<string, number>;
+  backupConfigured?: boolean;
 };
 
 const BACKUP_KEY = "natural-writer-preferences-v1";
@@ -20,6 +21,7 @@ export default function LearningPage() {
   const [importText, setImportText] = useState("");
   const [mode, setMode] = useState<"social" | "natural">("social");
   const [authored, setAuthored] = useState(false);
+  const [backupFile, setBackupFile] = useState<File | null>(null);
   const [configured, setConfigured] = useState<boolean | null>(null);
 
   async function refresh() {
@@ -80,6 +82,42 @@ export default function LearningPage() {
   async function resume(modeToResume: "social" | "natural") {
     const result = await send({ action: "resume", mode: modeToResume });
     if (result) setMessage("Apprendimento del profilo " + modeToResume + " ripreso.");
+  }
+
+  async function restoreBackup() {
+    if (!backupFile) return;
+    if (!window.confirm("Ripristinare i dati dal file? Gli eventi duplicati saranno ignorati, senza cancellare quelli esistenti.")) return;
+    setBusy(true);
+    setMessage("");
+    try {
+      const raw = JSON.parse(await backupFile.text()) as {
+        format?: string;
+        events?: Array<Record<string, unknown>>;
+      };
+      if (raw.format !== "natural-writer-learning-v1" || !Array.isArray(raw.events)) {
+        throw new Error("Backup non riconosciuto.");
+      }
+      let saved = 0;
+      for (let i = 0; i < raw.events.length; i += 10) {
+        const events = raw.events.slice(i, i + 10).map(item => ({
+          kind: item.kind, mode: item.mode, original: item.original,
+          preferred: item.preferred, rejected: item.rejected,
+          createdAt: item.created_at || item.createdAt,
+        }));
+        const result = await fetch("/api/learning", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "restore-backup", format: raw.format, events }),
+        });
+        const data = await result.json();
+        if (!result.ok) throw new Error(data.error || "Ripristino non riuscito.");
+        saved += Number(data.saved || 0);
+      }
+      await refresh();
+      setMessage(saved + " eventi recuperati dal backup.");
+      setBackupFile(null);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Errore di importazione backup.");
+    } finally { setBusy(false); }
   }
 
   async function erase() {
@@ -154,6 +192,11 @@ export default function LearningPage() {
           <section className="learningCard">
             <h2>Backup e controllo</h2>
             <p>Esporta lo storico completo per una copia indipendente. Puoi tornare a una versione precedente del profilo senza cancellare gli eventi originali.</p>
+            <p>Backup automatico giornaliero: <strong>{status?.backupConfigured ? "configurato" : "da configurare (Vercel Blob privato e CRON_SECRET)"}</strong>.</p>
+            <label>Ripristina un backup JSON
+              <input type="file" accept=".json,application/json" onChange={e => setBackupFile(e.target.files?.[0] || null)}/>
+            </label>
+            <button disabled={busy || !backupFile} onClick={() => void restoreBackup()}>Importa backup selezionato</button>
             <div className="learningActions">
               <a className="learningAction" href="/api/learning/export">Scarica backup JSON</a>
               <button disabled={busy} onClick={() => void restore("social")}>Ripristina Social</button>
