@@ -668,7 +668,15 @@ export async function rewriteFragment(
     model
   );
   const guard = checkSemanticGuard(fragment, candidate.trim(), locked);
-  return guard.valid ? candidate.trim() : fragment;
+  if (!guard.valid) return fragment;
+  const semanticModel = process.env.GEMINI_SEMANTIC_MODEL || process.env.GEMINI_JUDGE_MODEL || model;
+  try {
+    const ledger = await extractClaimLedger(fragment, semanticModel);
+    const result = await verifyAndRepair(fragment, candidate.trim(), ledger, semanticModel, locked);
+    return result.validated ? result.text : fragment;
+  } catch {
+    return fragment;
+  }
 }
 
 export async function humanizeText(text: string, options: HumanizeOptions) {
