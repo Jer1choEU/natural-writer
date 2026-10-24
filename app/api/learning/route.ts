@@ -45,9 +45,12 @@ export async function POST(request: Request) {
       const enabled = await setAutoLearning(owner, body.enabled);
       return NextResponse.json({ enabled });
     }
-    if (body.action === "record" || body.action === "migrate" || body.action === "import") {
+    if (body.action === "record" || body.action === "migrate" || body.action === "import" || body.action === "restore-backup") {
       if (!Array.isArray(body.events) || body.events.length === 0 || body.events.length > 50) {
         return NextResponse.json({ error: "Invia da 1 a 50 eventi validi." }, { status: 400 });
+      }
+      if (body.action === "restore-backup" && body.format !== "natural-writer-learning-v1") {
+        return NextResponse.json({ error: "Formato backup non riconosciuto." }, { status: 400 });
       }
       if (body.action === "import" && body.authored !== true) {
         return NextResponse.json({ error: "Conferma che i testi siano stati scritti da te." }, { status: 400 });
