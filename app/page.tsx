@@ -258,30 +258,64 @@ export default function Home() {
     }
   }
 
-  function choosePreference(index: number) {
-    if (selectedIndex !== null || alternatives.length < 2) return;
+  async function copyAlternative(index: number) {
+    const alternative = alternatives[index];
+    const generated = generatedAlternatives[index];
+    if (!alternative) return;
+    try {
+      await navigator.clipboard.writeText(alternative.text);
+    } catch {
+      setTrainingNotice("Impossibile copiare il testo negli appunti.");
+      return;
+    }
+    // Only a genuine, used human correction is suitable as an automatic signal.
+    if (storageMode !== "cloud" || !autoLearningEnabled ||
+        !generated || generated.text === alternative.text) return;
+    const event: LearningRecord = {
+      kind: "edit", mode, original: generated.text, preferred: alternative.text,
+      rejected: generated.text, createdAt: new Date().toISOString(),
+    };
+    setTrainingBusy(true);
+    await saveCloudEvents([event], true);
+    setTrainingBusy(false);
+  }
 
+  async function choosePreference(index: number) {
+    if (selectedIndex !== null || alternatives.length < 2 || trainingBusy) return;
     const preferred = alternatives[index];
     const rejected = alternatives[index === 0 ? 1 : 0];
     if (!preferred || !rejected) return;
-
-    const current = readPreferences();
-    const next: PreferenceRecord[] = [
-      ...current,
-      {
-        original: input.trim(),
-        preferred: preferred.text,
-        rejected: rejected.text,
-        createdAt: new Date().toISOString(),
-      },
-    ].slice(-MAX_STORED_PREFERENCES);
-
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-    setPreferenceCount(next.length);
+    const event: LearningRecord = {
+      kind: "choice", mode, original: input.trim(), preferred: preferred.text,
+      rejected: rejected.text, createdAt: new Date().toISOString(),
+    };
+    setTrainingBusy(true);
+    if (storageMode === "cloud") {
+      const events: LearningRecord[] = [event];
+      const generated = generatedAlternatives[index];
+      if (autoLearningEnabled && generated && preferred.text !== generated.text) {
+        events.push({
+          kind: "edit", mode, original: generated.text,
+          preferred: preferred.text, rejected: generated.text,
+          createdAt: new Date().toISOString(),
+        });
+      }
+      await saveCloudEvents(events, false);
+    } else {
+      const current = readPreferences();
+      const next: PreferenceRecord[] = [...current, event].slice(-MAX_STORED_PREFERENCES);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      setPreferenceCount(next.length);
+    }
     setSelectedIndex(index);
+    setTrainingBusy(false);
   }
 
   function resetTraining() {
+    if (storageMode === "cloud") {
+      setTrainingNotice("Per cancellare o esportare il training cloud, apri la sezione Memoria.");
+      return;
+    }
     localStorage.removeItem(STORAGE_KEY);
     setPreferenceCount(0);
     setSelectedIndex(null);
