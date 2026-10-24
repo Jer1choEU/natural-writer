@@ -4,6 +4,11 @@ import { AUTH_COOKIE, isValidAuthToken } from "@/lib/auth";
 
 /** Current deployment has one credential pair. All sessions of this login share one owner.
  * Future independent accounts should replace this with an authenticated immutable user ID. */
+export function configuredLearningOwnerId(): string {
+  if (!process.env.AUTH_USERNAME) throw new Error("ACCOUNT_NOT_CONFIGURED");
+  return configuredLearningOwnerId();
+}
+
 export async function requireLearningOwner(): Promise<string> {
   const token = (await cookies()).get(AUTH_COOKIE)?.value;
   if (!(await isValidAuthToken(token)) || !process.env.AUTH_USERNAME) {
