@@ -36,10 +36,10 @@ export function introducedCliches(original: string, rewritten: string): number {
 const boilerplateOpening = /^(?:in (?:materia|ambito|politica) |nel settore |nelle relazioni |sul (?:piano|fronte|terreno) |per quanto riguarda |il programma (?:prevede|propone)|l'obiettivo (?:complessivo|finale)|la transizione ecologica (?:gioca|occupa|richiede))/u;
 
 export function templateOpeningCount(text: string): number {
-  return text.toLocaleLowerCase("it")
+  return text
     .replace(/[’‘]/g, "'")
     .split(/\n\s*\n|\n(?=\p{Lu})/u)
-    .map((part) => part.trim())
+    .map((part) => part.trim().toLocaleLowerCase("it"))
     .filter(Boolean)
     .filter((part) => boilerplateOpening.test(part)).length;
 }
