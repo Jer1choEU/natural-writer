@@ -23,6 +23,9 @@ async function main() {
     };
     const first = await recordLearningEvents(owner, [event]);
     check(first.saved === 1, "first choice should be saved");
+    const firstStatus = await getLearningStatus(owner);
+    check(firstStatus.versions.social === 1, "Social profile created for Social selection");
+    check(!firstStatus.versions.natural, "Natural version must remain zero without Natural events");
     const duplicate = await recordLearningEvents(owner, [event]);
     check(duplicate.saved === 0, "duplicate should be ignored");
 
