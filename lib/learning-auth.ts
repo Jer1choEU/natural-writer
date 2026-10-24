@@ -6,7 +6,7 @@ import { AUTH_COOKIE, isValidAuthToken } from "@/lib/auth";
  * Future independent accounts should replace this with an authenticated immutable user ID. */
 export function configuredLearningOwnerId(): string {
   if (!process.env.AUTH_USERNAME) throw new Error("ACCOUNT_NOT_CONFIGURED");
-  return configuredLearningOwnerId();
+  return createHash("sha256").update("natural-writer-owner:" + process.env.AUTH_USERNAME).digest("hex");
 }
 
 export async function requireLearningOwner(): Promise<string> {
@@ -14,7 +14,7 @@ export async function requireLearningOwner(): Promise<string> {
   if (!(await isValidAuthToken(token)) || !process.env.AUTH_USERNAME) {
     throw new Error("UNAUTHORIZED");
   }
-  return createHash("sha256").update("natural-writer-owner:" + process.env.AUTH_USERNAME).digest("hex");
+  return configuredLearningOwnerId();
 }
 
 export function verifyLearningOrigin(request: Request): void {
