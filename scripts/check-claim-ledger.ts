@@ -2,7 +2,7 @@
  * Offline schema / gate regression suite. These fixtures do NOT constitute
  * empirical LLM accuracy measurements; live A/B evaluation is a separate task.
  */
-import { parseLedger, parseVerification, sourceChunks, extractClaimLedger, verifyAndRepair } from "../lib/claim-ledger";
+import { parseLedger, parseVerification, sourceChunks, sourceExcerpt, extractClaimLedger, verifyAndRepair } from "../lib/claim-ledger";
 import { checkSemanticGuard } from "../lib/semantic-guard";
 import { parseEditorialPlan, splitEditorialParagraphs } from "../lib/editorial-plan";
 
@@ -72,6 +72,24 @@ for (const [i, fixture] of fixtures.entries()) {
   }, ledger);
   assert(!extra.valid, "Unsupported addition must fail " + i);
 }
+
+const apostropheOriginal = "L’economia circolare richiede meno rifiuti.";
+const recovered = sourceExcerpt("L'economia circolare richiede meno rifiuti.", apostropheOriginal);
+assert(recovered === apostropheOriginal, "Curly apostrophe must resolve to exact original excerpt");
+const whitespaceOriginal = "Il Movimento sostiene la raccolta\\n  differenziata.";
+assert(sourceExcerpt("Il Movimento sostiene la raccolta differenziata.", whitespaceOriginal) === whitespaceOriginal,
+  "Whitespace differences must preserve the exact source anchor");
+assert(sourceExcerpt("Il Movimento chiede nuovi inceneritori.", whitespaceOriginal) === "",
+  "Semantic paraphrases must not be accepted as anchored excerpts");
+const optionalMetadataClaim = {
+  source: apostropheOriginal, subject: "economia circolare", action: "richiede",
+};
+const parsedOptional = parseLedger({ claims: [optionalMetadataClaim] }, apostropheOriginal);
+assert(parsedOptional.claims[0].conditions.length === 0 && parsedOptional.claims[0].requiredDetails.length === 0,
+  "Missing optional arrays must not reject a valid anchored claim");
+rejects(() => parseLedger({ claims: [{ ...optionalMetadataClaim, source: "La combustione è obbligatoria." }] }, apostropheOriginal),
+  "Unrelated source excerpts must still fail");
+
 const original = "Il gruppo chiede più fondi. Gli iscritti propongono nuove misure.";
 const two = parseLedger({ claims: [
   claimFor("Il gruppo chiede più fondi."),
@@ -140,6 +158,9 @@ async function mockNetworkPipeline() {
         candidates: [{ content: { parts: [{ text: JSON.stringify(body) }] } }],
       }), { status: 200, headers: { "Content-Type": "application/json" } });
     }) as typeof fetch;
+    responses = [{ claims: [{ source, subject: "gruppo", action: "chiede", conditions: "invalid" }] }, rawLedger];
+    const retryLedger = await extractClaimLedger(source, "gemini-3.5-flash-lite");
+    assert(retryLedger.claims.length === 1, "Malformed extracted metadata must trigger one safe retry");
     responses = [rawLedger];
     const ledger = await extractClaimLedger(source, "gemini-3.5-flash-lite");
     assert(ledger.claims.length === 1, "Network extraction must produce source-anchored claims");
