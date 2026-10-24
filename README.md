@@ -42,13 +42,13 @@ testo originale
   ↓
 analisi stilistica + ossatura semantica
   ↓
-3 strategie di riscrittura indipendenti
+2 o 3 strategie secondo la lunghezza
   ↓
-ranking delle candidate
+ranking, controllo e revisione
   ↓
-controllo di fedeltà
+controllo deterministico, riparazione mirata
   ↓
-eventuale near-copy repair
+Quality Judge nella selezione
   ↓
 output finale
 ```
@@ -65,7 +65,7 @@ Il training usa due livelli:
 
 Il profilo è conservativo: una singola scelta ha peso basso e fedeltà semantica e naturalezza hanno sempre priorità.
 
-Per ora lo storico resta nel browser tramite `localStorage`; la persistenza account/server e la sincronizzazione tra dispositivi sono ancora da implementare.
+Per ora lo storico resta nel browser tramite `localStorage`; la persistenza account/server e la sincronizzazione tra dispositivi sono ancora da implementare. Anche le modifiche manuali alle alternative prima della scelta A/B alimentano il profilo.
 
 ## Stack
 
@@ -213,4 +213,23 @@ Il benchmark combina due livelli di valutazione:
 - **Heuristic score**: segnali tecnici deterministici su lunghezza, ripetizioni, formule generiche e struttura.
 - **Quality Judge**: valutazione editoriale separata su fedeltà, naturalezza, ritmo, specificità e assenza di tic artificiali.
 
-Il judge usa `GEMINI_JUDGE_MODEL` (default: `gemini-3.5-flash-lite`) e non blocca l'intera run se temporaneamente non disponibile.
+Il judge usa `GEMINI_JUDGE_MODEL` (default: `gemini-3.5-flash-lite`) e viene impiegato anche per scegliere le candidate nella riscrittura ordinaria. Non blocca la generazione se indisponibile.
+
+
+## Qualità v2 (ottobre 2026)
+
+- Riscrittura selettiva: conserva le frasi già naturali e interviene sulle parti rigide.
+- Pipeline adattiva: 2 candidate per testi brevi e medi, 3 per testi lunghi, con fasi di analisi opzionali.
+- Verifica deterministica finale su numeri, citazioni, sigle e termini protetti; riparazione mirata e fallback conservativo.
+- Quality Judge utilizzato nel ranking delle alternative, non soltanto nel benchmark.
+- Scelta di alternative A/B diverse quando la qualità lo permette.
+- Editor delle alternative modificabile e riformulazione del solo passaggio selezionato.
+- Il training A/B memorizza anche la versione modificata manualmente prima della scelta.
+- Interfaccia per modalità, intensità, tono, preset, piattaforma, termini bloccati e opzioni social.
+- Stile M5S applicato solo quando viene esplicitamente selezionato.
+- Metriche italiane: Gulpease, diversità lessicale, variazione dei periodi, densità di punteggiatura e formule ricorrenti.
+- Nuovo workflow Quality checks. Verifica gratuita: npm run quality-check, npm run typecheck, npm run build.
+
+### Limiti e costi
+
+Il controllo semantico deterministico non può garantire da solo l'equivalenza di tutte le affermazioni. I punteggi automatici non sono una misura certa della paternità umana. La pipeline usa più chiamate a Gemini (incluso il Judge, quando disponibile), quindi testo, intensità e numero di candidate incidono sulla quota. Manca ancora un grande benchmark italiano con valutazioni umane indipendenti. Il training resta locale al browser, senza sincronizzazione tra dispositivi.
