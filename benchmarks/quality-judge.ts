@@ -9,6 +9,7 @@ export type QualityJudgeResult = {
   semanticCoverage: number;
   structurePreservation: number;
   rewriteDepth: number;
+  editorialGain: number;
   overall: number;
   notes: string[];
 };
@@ -110,6 +111,10 @@ Assegna un punteggio da 0 a 10 per:
 - Non interpretare una preferenza comparativa come opposizione categorica: «privilegia il negoziato rispetto alle spese militari» NON equivale necessariamente a «si oppone alle spese militari».
 - Penalizza formule introdotte inutilmente come «gioca un ruolo chiave», «una priorità fondamentale» o personificazioni come «la legalità chiama».
 - Valuta anche se la riscrittura costituisce un miglioramento reale in naturalezza e precisione rispetto al testo di partenza; cambiare solo sinonimi non è un miglioramento.
+- editorialGain: confronta DIRETTAMENTE la leggibilità della versione riscritta con quella dell'originale: 5 equivale a nessun miglioramento; 0-3 è un peggioramento; 6-8 un miglioramento reale; 9-10 un miglioramento eccezionale. Non premiare più parole diverse.
+- Se l'originale ha già un periodo naturale, lasciarlo invariato è corretto. Ma non considerare un miglioramento un testo che cambia soltanto virgole o sinonimi irrilevanti.
+- Valuta il testo come insieme: ripetere sistematicamente paragrafi del tipo «In materia...», «Sul piano...», «Nel settore...» non aumenta la naturalezza.
+- Registra come difetto semantico il passaggio da «limitare» ad «arrestare», da «riduzione» ad «azzeramento», o da «autonomia maggiore» ad «autonomia perduta» senza fondamento.
 
 Intensità richiesta: ${intensity}.
 
@@ -134,6 +139,7 @@ Restituisci SOLO JSON valido con questa forma:
   "semanticCoverage": 0,
   "structurePreservation": 0,
   "rewriteDepth": 0,
+  "editorialGain": 5,
   "overall": 0,
   "notes": ["massimo 3 osservazioni brevi"]
 }
@@ -156,6 +162,7 @@ ${rewritten}
     semanticCoverage: clampScore(raw.semanticCoverage),
     structurePreservation: clampScore(raw.structurePreservation),
     rewriteDepth: clampScore(raw.rewriteDepth),
+    editorialGain: clampScore(raw.editorialGain ?? 5),
     overall: clampScore(raw.overall),
     notes: Array.isArray(raw.notes) ? raw.notes.slice(0, 3).map(String) : [],
   };
