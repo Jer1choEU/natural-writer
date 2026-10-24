@@ -325,15 +325,14 @@ export default function Home() {
     <main className="shell">
       <div className="trainingBar">
         <span>
-          Training locale: <strong>{preferenceCount}</strong> scelte
-          {preferenceCount > 0 && (
-            <> · profilo su {preferenceCount} scelte · ultimi {Math.min(preferenceCount, MAX_RECENT_EXAMPLES)} esempi diretti</>
-          )}
+          {storageMode === "cloud" ? "Memoria cloud" : storageMode === "local" ? "Training locale" : "Memoria"}:
+          {" "}<strong>{preferenceCount}</strong> {storageMode === "cloud" ? "eventi" : "scelte"}
+          {storageMode === "cloud" && autoLearningEnabled ? " · Auto-Learning attivo" : ""}
+          {storageMode === "local" && preferenceCount > 0 ? ` · ultimi ${Math.min(preferenceCount, MAX_RECENT_EXAMPLES)} esempi diretti` : ""}
         </span>
-        {preferenceCount > 0 && (
-          <button className="resetTraining" onClick={resetTraining}>
-            Azzera training
-          </button>
+        <a className="memoryLink" href="/learning">Memoria e training →</a>
+        {storageMode === "local" && preferenceCount > 0 && (
+          <button className="resetTraining" onClick={resetTraining}>Azzera training locale</button>
         )}
       </div>
 
@@ -364,6 +363,7 @@ export default function Home() {
           </button>
           {error && <p className="error">{error}</p>}
           {fragmentError && <p className="error">{fragmentError}</p>}
+          {trainingNotice && <p className="hint" role="status">{trainingNotice}</p>}
         </aside>
 
         <div className="panel resultPanel">
@@ -399,7 +399,7 @@ export default function Home() {
                       <strong>Versione {index === 0 ? "A" : "B"}</strong>
                       <button
                         className="copy"
-                        onClick={() => navigator.clipboard.writeText(alternative.text)}
+                        onClick={() => void copyAlternative(index)}
                       >
                         Copia
                       </button>
@@ -428,7 +428,7 @@ export default function Home() {
                     {alternatives.length >= 2 && (
                       <button
                         className="choiceButton"
-                        disabled={selectedIndex !== null || fragmentBusyIndex !== null}
+                        disabled={selectedIndex !== null || fragmentBusyIndex !== null || trainingBusy}
                         onClick={() => choosePreference(index)}
                       >
                         {selected
