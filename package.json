@@ -10,7 +10,8 @@
     "benchmark": "tsx scripts/run-benchmark.ts",
     "knowledge-check": "tsx scripts/check-m5s-knowledge.ts",
     "coherence-check": "tsx scripts/check-m5s-coherence.ts",
-    "profile-check": "tsx scripts/check-preference-profile.ts"
+    "profile-check": "tsx scripts/check-preference-profile.ts",
+    "quality-check": "tsx scripts/check-editorial-quality.ts"
   },
   "dependencies": {
     "next": "15.5.7",

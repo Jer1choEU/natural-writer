@@ -1,4 +1,7 @@
 import { getPresetRules, type StylePreset } from "@/lib/style-presets";
+import { checkSemanticGuard, formatSemanticIssues } from "@/lib/semantic-guard";
+import { identifyEditorialFlags } from "@/lib/editorial-metrics";
+import { judgeRewrite } from "@/benchmarks/quality-judge";
 import { getM5SStyleRules } from "@/lib/m5s-style";
 import { getM5SKnowledgeContext } from "@/lib/m5s-knowledge";
 import {
@@ -28,6 +31,8 @@ export type HumanizeOptions = {
   preferenceExamples?: PreferenceExample[];
   preferenceProfile?: StylePreferenceProfile;
   returnAlternatives?: boolean;
+  lockedTerms?: string[];
+  politicalStyle?: boolean;
 };
 
 const defaultModel = process.env.GEMINI_MODEL || "gemini-3.5-flash-lite";
@@ -163,15 +168,15 @@ function intensityRules(intensity: HumanizeOptions["intensity"]) {
       ].join(" ");
     default:
       return [
-        "Obiettivo dell'intensità media: produrre una vera riscrittura, non una semplice revisione dell'originale.",
+        "Obiettivo dell'intensità media: intervenire sui passaggi rigidi e ripetitivi, conservando quelli già efficaci.",
         "Mantieni la stessa struttura logica: stesso ordine delle idee, stessa funzione dei paragrafi, stessi rapporti tra causa, conseguenza, contrasto, esempio e conclusione.",
         "La forma linguistica, invece, deve cambiare in modo percepibile. Riscrivi le frasi come unità di senso, non parola per parola.",
-        "Nella maggior parte delle frasi non banali modifica almeno uno o due elementi tra: attacco, verbo principale, costruzione sintattica, ordine interno dei complementi, coordinazione o subordinazione, segmentazione del periodo.",
+        "Cambia attacco, verbo principale e struttura quando migliorano davvero la frase; non forzare modifiche inutili.",
         "Puoi mantenere identiche le ancore semantiche davvero precise, i nomi, i termini tecnici e le espressioni che perderebbero significato se parafrasate; tutto il resto può essere riformulato se resta naturale.",
-        "Evita di conservare intere frasi soltanto perché sono già corrette: se puoi esprimere esattamente la stessa idea in una forma diversa e altrettanto naturale, fallo.",
+        "Conserva le frasi già precise, spontanee e ben scritte.",
         "Non inseguire sinonimi: una buona riscrittura nasce da una nuova costruzione della frase, non dalla sostituzione lessicale meccanica.",
         "Mantieni per quanto possibile il numero e l'ordine dei paragrafi; spezza o unisci periodi solo all'interno dello stesso blocco logico quando migliora il ritmo.",
-        "Il risultato deve essere chiaramente riconoscibile come una nuova formulazione, pur dicendo la stessa cosa con la stessa voce, lo stesso livello di enfasi e la stessa architettura argomentativa.",
+        "Il risultato deve essere più naturale e leggibile, senza perseguire una distanza lessicale artificiale.",
       ].join(" ");
   }
 }
@@ -259,7 +264,7 @@ function buildAnalysisInstructions(options: HumanizeOptions) {
     "Non giudicare se il testo sia stato scritto da una IA e non cercare di eludere sistemi di rilevazione.",
     `Modalità richiesta: ${options.mode}.`,
     `Intensità: ${options.intensity || "media"}.`,
-    getM5SStyleRules(),
+    ...(options.politicalStyle ? [getM5SStyleRules()] : []),
     "Restituisci un piano di riscrittura molto conciso, massimo 8 punti, senza riscrivere ancora il testo.",
   ].join(" ");
 }
@@ -290,8 +295,8 @@ function buildRankingInstructions(options: HumanizeOptions) {
     "Valuta prima di tutto fedeltà semantica completa: nessuna omissione sostanziale, nessuna aggiunta, nessuno slittamento di significato, nessun cambio del grado di certezza.",
     "Verifica mentalmente l'equivalenza in entrambe le direzioni: tutto ciò che afferma l'originale deve essere recuperabile dalla riscrittura e tutto ciò che afferma la riscrittura deve essere supportato dall'originale.",
     "Poi valuta naturalezza, concretezza, voce, ritmo e precisione.",
-    "Per intensità media premia una vera riformulazione: stessa architettura delle idee ma superficie linguistica chiaramente diversa.",
-    "Usa la similarità superficiale fornita come segnale, non come obiettivo assoluto. Una similarità molto alta indica possibile near-copy; una similarità molto bassa può indicare deriva semantica.",
+    "Premia il miglioramento editoriale, non la distanza artificiale dalla superficie del testo.",
+    "La similarità superficiale è solo un indicatore: non premiarla o penalizzarla automaticamente.",
     "Preferisci differenze ottenute tramite nuova sintassi e nuova costruzione della frase, non tramite sinonimi ricercati o innaturali.",
     "Scarta una candidata se altera fatti, negazioni, causalità, soggetti, ruoli, qualifiche, responsabilità, azioni, inviti o intensità del giudizio, anche se è stilisticamente bella.",
     "Considera errore semantico sostituire un ruolo con uno solo plausibile ma non equivalente, oppure trasformare un'azione generica in una modalità più specifica non dichiarata.",
@@ -319,12 +324,12 @@ function buildRewriteInstructions(options: HumanizeOptions, strategy?: Candidate
     "Non correggere una voce personale solo perché è irregolare: correggi ciò che suona meccanico, non ciò che suona umano.",
     "Conserva la macrostruttura del testo, ma non imitare la sintassi dell'originale frase per frase.",
     "Parafrasa per unità di senso: prima comprendi l'idea completa, poi esprimila di nuovo con una costruzione autonoma e naturale.",
-    "Quando puoi scegliere tra una bozza quasi identica e una formulazione diversa ma semanticamente equivalente, preferisci la seconda se resta semplice, precisa e credibile.",
+    "Quando puoi scegliere tra due formulazioni equivalenti, preferisci quella realmente più naturale.",
     ...antiTicRules,
     intensityRules(options.intensity),
     modeRules(options),
     getPresetRules(options.preset),
-    getM5SStyleRules(),
+    ...(options.politicalStyle ? [getM5SStyleRules()] : []),
     buildPreferenceRules(options),
     ...(strategy ? candidateStrategies.find((candidate) => candidate.id === strategy)?.rules || [] : []),
     `Tono richiesto: ${options.tone || "diretto"}.`,
@@ -344,7 +349,7 @@ function buildDepthRepairInstructions(options: HumanizeOptions) {
     intensityRules(options.intensity),
     modeRules(options),
     getPresetRules(options.preset),
-    getM5SStyleRules(),
+    ...(options.politicalStyle ? [getM5SStyleRules()] : []),
     buildPreferenceRules(options),
     `Tono richiesto: ${options.tone || "diretto"}.`,
     "Restituisci esclusivamente il testo finale, senza note.",
@@ -372,7 +377,7 @@ function buildReviewInstructions(options: HumanizeOptions) {
     "Controlla che il testo non sia diventato troppo levigato, simmetrico o prevedibile.",
     "Se due frasi consecutive hanno struttura o ritmo troppo simili, rendile più naturali senza introdurre nuove informazioni.",
     "Verifica anche il problema opposto: se la bozza conserva troppe frasi quasi identiche all'originale, riformula le parti non protette cambiando realmente la costruzione sintattica, senza toccare le ancore semantiche.",
-    "Per intensità media, il testo finale deve conservare la stessa architettura delle idee ma risultare chiaramente riscritto nella maggior parte dei passaggi: evita sequenze estese copiate quasi letteralmente quando possono essere espresse diversamente senza perdita di precisione.",
+    "Per intensità media verifica che i passaggi problematici siano stati migliorati, senza alterare quelli già efficaci.",
     "Esegui un passaggio finale dedicato alla punteggiatura: controlla incisi, subordinate, coordinazioni, domande, due punti e pause interne.",
     "Correggi virgole mancanti intorno agli incisi quando servono alla leggibilità; evita però la virgola tra soggetto e verbo o tra verbo e complemento diretto.",
     "Quando una frase è troppo lunga, valuta un punto fermo invece di accumulare virgole.",
@@ -381,7 +386,7 @@ function buildReviewInstructions(options: HumanizeOptions) {
     intensityRules(options.intensity),
     modeRules(options),
     getPresetRules(options.preset),
-    getM5SStyleRules(),
+    ...(options.politicalStyle ? [getM5SStyleRules()] : []),
     buildPreferenceRules(options),
     "Restituisci esclusivamente la versione finale pronta all'uso.",
   ].join(" ");
@@ -462,6 +467,15 @@ async function generateText(instructions: string, input: string, selectedModel: 
   throw lastError || new Error("Gemini API error sconosciuto");
 }
 
+
+type FinalizedCandidate = {
+  text: string;
+  finalSimilarity: number;
+  depthRepairApplied: boolean;
+  semanticGuardPassed: boolean;
+  semanticIssues: number;
+};
+
 async function finalizeDraft(
   original: string,
   semanticSkeleton: string,
@@ -470,41 +484,12 @@ async function finalizeDraft(
   options: HumanizeOptions,
   selectedModel: string,
   knowledgeContext: string
-) {
-  const finalPass = await generateText(
-    buildReviewInstructions(options),
-    [
-      "ORIGINALE:",
-      original,
-      "",
-      "OSSATURA SEMANTICA:",
-      semanticSkeleton,
-      ...(knowledgeContext ? ["", knowledgeContext] : []),
-      "",
-      "BOZZA SELEZIONATA:",
-      draft,
-      "",
-      `SIMILARITÀ SUPERFICIALE DELLA BOZZA: ${draftSimilarity}`,
-    ].join("\n"),
-    selectedModel
-  );
-
-  let finalText = finalPass.trim();
-  let finalSimilarity = surfaceSimilarity(original, finalText);
-  let depthRepairApplied = false;
-
-  const wordCount = original.trim().split(/\s+/).filter(Boolean).length;
-  const depthRepairThreshold =
-    options.intensity === "profonda"
-      ? 0.42
-      : options.intensity === "leggera"
-        ? 1
-        : 0.48;
-
-  if (wordCount >= 12 && finalSimilarity > depthRepairThreshold) {
-    finalText = (
-      await generateText(
-        buildDepthRepairInstructions(options),
+): Promise<FinalizedCandidate> {
+  const fastPath = original.trim().split(/\s+/).length <= 45;
+  const reviewed = fastPath
+    ? draft
+    : await generateText(
+        buildReviewInstructions(options),
         [
           "ORIGINALE:",
           original,
@@ -513,23 +498,133 @@ async function finalizeDraft(
           semanticSkeleton,
           ...(knowledgeContext ? ["", knowledgeContext] : []),
           "",
-          "VERSIONE DA RENDERE MENO LETTERALE:",
-          finalText,
+          "BOZZA SELEZIONATA:",
+          draft,
           "",
-          `SIMILARITÀ SUPERFICIALE ATTUALE: ${finalSimilarity}`,
+          "SIMILARITÀ SUPERFICIALE: " + draftSimilarity,
         ].join("\n"),
         selectedModel
-      )
-    ).trim();
-    finalSimilarity = surfaceSimilarity(original, finalText);
+      );
+
+  let finalText = reviewed.trim();
+  let depthRepairApplied = false;
+  const editorialFlags = identifyEditorialFlags(original);
+  let similarity = surfaceSimilarity(original, finalText);
+
+  // Target a demonstrably problematic near-copy, not an arbitrary lexical-distance quota.
+  if (editorialFlags.length >= 2 && similarity > 0.86 && options.intensity !== "leggera") {
+    const repaired = await generateText(
+      [
+        "Riscrivi esclusivamente i passaggi problematici indicati sotto.",
+        "Mantieni le frasi già naturali e ogni informazione verificabile.",
+        "Evita sostituzioni decorative e cambiamenti di significato.",
+        intensityRules(options.intensity),
+        "Restituisci solo il testo finale.",
+      ].join("\n"),
+      [
+        "ORIGINALE:",
+        original,
+        "BOZZA:",
+        finalText,
+        "PROBLEMI:",
+        ...editorialFlags.map((flag) => flag.sentence + " — " + flag.reasons.join(", ")),
+      ].join("\n"),
+      selectedModel
+    );
+    finalText = repaired.trim();
     depthRepairApplied = true;
+    similarity = surfaceSimilarity(original, finalText);
+  }
+
+  const terms = (options.lockedTerms || []).filter((term) =>
+    original.toLocaleLowerCase("it").includes(term.toLocaleLowerCase("it"))
+  );
+  let guard = checkSemanticGuard(original, finalText, terms);
+  if (!guard.valid) {
+    const repaired = await generateText(
+      [
+        "Ripara solo gli errori fattuali e gli elementi protetti segnalati.",
+        "Non introdurre fatti, date, nomi, citazioni o sigle non presenti nell'originale.",
+        "Non cambiare altre parti se non strettamente necessario.",
+        "Restituisci esclusivamente il testo finale.",
+      ].join("\n"),
+      [
+        "ORIGINALE:",
+        original,
+        "VERSIONE DA CORREGGERE:",
+        finalText,
+        "ERRORI:",
+        formatSemanticIssues(guard.issues),
+      ].join("\n\n"),
+      selectedModel
+    );
+    const repairGuard = checkSemanticGuard(original, repaired.trim(), terms);
+    if (repairGuard.valid) {
+      finalText = repaired.trim();
+      guard = repairGuard;
+    } else {
+      // If the first draft was safe, retain it; otherwise keep the original.
+      const draftGuard = checkSemanticGuard(original, draft, terms);
+      finalText = draftGuard.valid ? draft : original;
+      guard = checkSemanticGuard(original, finalText, terms);
+    }
   }
 
   return {
     text: finalText,
-    finalSimilarity,
+    finalSimilarity: surfaceSimilarity(original, finalText),
     depthRepairApplied,
+    semanticGuardPassed: guard.valid,
+    semanticIssues: guard.issues.length,
   };
+}
+
+async function evaluateQuality(
+  original: string,
+  candidate: FinalizedCandidate,
+  options: HumanizeOptions
+) {
+  try {
+    const result = await judgeRewrite(
+      original,
+      candidate.text,
+      options.intensity || "media"
+    );
+    return {
+      quality: result,
+      score: result.overall * 0.6 + result.fidelity * 0.2 + result.semanticPrecision * 0.2,
+    };
+  } catch {
+    // An unavailable judge must not make the editor unusable.
+    return { quality: null, score: null };
+  }
+}
+
+export async function rewriteFragment(
+  fragment: string,
+  context: string,
+  options: HumanizeOptions
+): Promise<string> {
+  const model = options.model || defaultModel;
+  const locked = (options.lockedTerms || []).filter((term) =>
+    fragment.toLocaleLowerCase("it").includes(term.toLocaleLowerCase("it"))
+  );
+  const candidate = await generateText(
+    [
+      "Riscrivi esclusivamente il passaggio richiesto, senza modificare il resto del documento.",
+      "Usa il contesto solo per capire i riferimenti: non aggiungere informazioni.",
+      "Mantieni numeri, date, citazioni, sigle, tono e livello di certezza.",
+      "Conserva letteralmente i termini protetti: " + (locked.join(", ") || "nessuno"),
+      intensityRules(options.intensity),
+      modeRules(options),
+      ...(options.politicalStyle ? [getM5SStyleRules()] : []),
+      "Restituisci soltanto il passaggio riscritto.",
+    ].join("\n"),
+    ["TESTO COMPLETO (contesto):", context.slice(0, 12000), "PASSAGGIO:", fragment].join("\n\n"),
+    model
+  );
+  const guard = checkSemanticGuard(fragment, candidate.trim(), locked);
+  return guard.valid ? candidate.trim() : fragment;
 }
 
 export async function humanizeText(text: string, options: HumanizeOptions) {
@@ -540,135 +635,165 @@ export async function humanizeText(text: string, options: HumanizeOptions) {
       options.preferenceProfile ||
       derivePreferenceProfile(options.preferenceExamples || []),
   };
+
   const m5sKnowledge = getM5SKnowledgeContext(text);
+  const knowledgeContext = options.politicalStyle ? m5sKnowledge.context : "";
+  const wordCount = text.trim().split(/\s+/).filter(Boolean).length;
+  const fastPath = wordCount <= 45;
+  const detailedPath = wordCount > 180;
+  const flags = identifyEditorialFlags(text);
 
   const [analysis, semanticSkeleton] = await Promise.all([
-    generateText(
-      buildAnalysisInstructions(options),
-      [
-        "TESTO:",
-        text,
-        ...(m5sKnowledge.context ? ["", m5sKnowledge.context] : []),
-      ].join("\n"),
-      selectedModel
-    ),
-    generateText(buildSemanticSkeletonInstructions(options), text, selectedModel),
+    detailedPath
+      ? generateText(
+          buildAnalysisInstructions(options),
+          [
+            "TESTO:",
+            text,
+            ...(knowledgeContext ? ["", knowledgeContext] : []),
+            "PASSAGGI DA VALUTARE:",
+            ...flags.map((flag) => flag.sentence + " — " + flag.reasons.join(", ")),
+          ].join("\n"),
+          selectedModel
+        )
+      : Promise.resolve(
+          flags.map((flag) => flag.sentence + ": " + flag.reasons.join(", ")).join("\n") ||
+          "Migliora solo i passaggi che ne hanno bisogno, preservando le formulazioni riuscite."
+        ),
+    fastPath
+      ? Promise.resolve("Preserva ogni fatto, citazione, negazione, ruolo e termine preciso.")
+      : generateText(buildSemanticSkeletonInstructions(options), text, selectedModel),
   ]);
 
+  const strategies = detailedPath ? candidateStrategies : candidateStrategies.slice(0, 2);
   const drafts = await Promise.all(
-    candidateStrategies.map((candidate) =>
+    strategies.map((strategy) =>
       generateText(
-        buildRewriteInstructions(options, candidate.id),
+        buildRewriteInstructions(options, strategy.id),
         [
           "TESTO ORIGINALE:",
           text,
-          "",
           "OSSATURA SEMANTICA DA PRESERVARE:",
           semanticSkeleton,
-          "",
           "PIANO EDITORIALE:",
           analysis,
-          ...(m5sKnowledge.context ? ["", m5sKnowledge.context] : []),
-        ].join("\n"),
+          ...(knowledgeContext ? ["", knowledgeContext] : []),
+          "PAROLE PROTETTE:",
+          (options.lockedTerms || []).join(", ") || "nessuna",
+          "Non modificare frasi già efficaci soltanto per aumentare la distanza lessicale.",
+        ].join("\n\n"),
         selectedModel
       )
     )
   );
-
   const similarities = drafts.map((draft) => surfaceSimilarity(text, draft));
 
-  const rankingInput = [
-    "ORIGINALE:",
-    text,
-    "",
-    "OSSATURA SEMANTICA:",
-    semanticSkeleton,
-    ...(m5sKnowledge.context ? ["", m5sKnowledge.context] : []),
-    "",
-    ...drafts.flatMap((draft, index) => [
-      `CANDIDATA ${candidateStrategies[index].label} — similarità superficiale: ${similarities[index]}`,
-      draft,
-      "",
-    ]),
-  ].join("\n");
-
-  const ranking = await generateText(
-    buildRankingInstructions(options),
-    rankingInput,
-    selectedModel
-  );
-
-  const candidateOrder = parseCandidateOrder(ranking);
-  const finalistIndexes = options.returnAlternatives
-    ? candidateOrder.slice(0, 2)
-    : candidateOrder.slice(0, 1);
+  const candidateOrder = detailedPath
+    ? parseCandidateOrder(
+        await generateText(
+          buildRankingInstructions(options),
+          [
+            "ORIGINALE:",
+            text,
+            "OSSATURA SEMANTICA:",
+            semanticSkeleton,
+            ...drafts.flatMap((draft, index) => [
+              "CANDIDATA " + strategies[index].label + " — similarità: " + similarities[index],
+              draft,
+            ]),
+          ].join("\n\n"),
+          selectedModel
+        )
+      )
+    : strategies.map((_, index) => index);
 
   const finalized = await Promise.all(
-    finalistIndexes.map((index) =>
+    candidateOrder.map((index) =>
       finalizeDraft(
-        text,
-        semanticSkeleton,
-        drafts[index],
-        similarities[index],
-        options,
-        selectedModel,
-        m5sKnowledge.context
+        text, semanticSkeleton, drafts[index], similarities[index],
+        options, selectedModel, knowledgeContext
       )
     )
   );
+  const assessments = await Promise.all(
+    finalized.map((candidate) => evaluateQuality(text, candidate, options))
+  );
+  const ranked = finalized
+    .map((candidate, index) => ({
+      ...candidate,
+      index: candidateOrder[index],
+      initialRank: index,
+      score: assessments[index].score,
+      quality: assessments[index].quality,
+    }))
+    .sort((a, b) => {
+      if (a.semanticGuardPassed !== b.semanticGuardPassed) return a.semanticGuardPassed ? -1 : 1;
+      if (a.score !== null && b.score !== null && a.score !== b.score) return b.score - a.score;
+      return a.initialRank - b.initialRank;
+    });
+  const first = ranked[0];
+  if (!first) throw new Error("Nessuna riscrittura generata.");
 
-  const primary = finalized[0];
-  const selectedIndex = finalistIndexes[0];
-  const depthRepairApplied = finalized.some((candidate) => candidate.depthRepairApplied);
-
-  const stages = [
-    "analysis",
-    "semantic-skeleton",
-    "multi-candidate-rewrite",
-    "candidate-ranking",
-    "faithfulness-review",
-  ];
-  if (depthRepairApplied) stages.push("near-copy-repair");
-  if (options.preferenceExamples?.length) stages.push("preference-conditioning");
-  if (options.preferenceProfile?.sampleCount) stages.push("style-profile-conditioning");
-  if (m5sKnowledge.matches.length) stages.push("m5s-knowledge-conditioning");
+  // Choose a useful alternative, not another nearly identical copy.
+  const others = ranked.slice(1);
+  const distinct = others.find((candidate) =>
+    surfaceSimilarity(first.text, candidate.text) < 0.72 &&
+    (candidate.score === null || first.score === null || candidate.score >= first.score - 1.5)
+  );
+  const second = distinct || others[0];
+  const chosen = options.returnAlternatives && second ? [first, second] : [first];
 
   const alternatives = options.returnAlternatives
-    ? finalized.map((candidate, position) => {
-        const sourceIndex = finalistIndexes[position];
-        return {
-          id: position === 0 ? "A" : "B",
-          text: candidate.text,
-          similarity: candidate.finalSimilarity,
-          strategy: candidateStrategies[sourceIndex].id,
-        };
-      })
+    ? chosen.map((candidate, position) => ({
+        id: position === 0 ? "A" : "B",
+        text: candidate.text,
+        similarity: candidate.finalSimilarity,
+        strategy: strategies[candidate.index].id,
+        qualityScore: candidate.score === null ? null : Number(candidate.score.toFixed(2)),
+        semanticGuardPassed: candidate.semanticGuardPassed,
+      }))
     : undefined;
 
+  const stages = [
+    ...(detailedPath ? ["analysis"] : []),
+    ...(!fastPath ? ["semantic-skeleton"] : []),
+    "adaptive-multi-candidate-rewrite",
+    ...(detailedPath ? ["candidate-ranking"] : []),
+    ...(!fastPath ? ["faithfulness-review"] : []),
+    "deterministic-semantic-guard",
+    "quality-ranking",
+  ];
+  if (chosen.some((candidate) => candidate.depthRepairApplied)) stages.push("targeted-repair");
+  if (options.preferenceExamples?.length) stages.push("preference-conditioning");
+  if (options.preferenceProfile?.sampleCount) stages.push("style-profile-conditioning");
+  if (options.politicalStyle && m5sKnowledge.matches.length) stages.push("m5s-knowledge-conditioning");
+
   return {
-    text: primary.text,
+    text: first.text,
     alternatives,
     meta: {
       provider: "gemini",
       model: selectedModel,
       stages,
       candidates: drafts.length,
-      selectedCandidate: candidateStrategies[selectedIndex].label,
-      selectedStrategy: candidateStrategies[selectedIndex].id,
-      selectedSurfaceSimilarity: similarities[selectedIndex],
-      finalSurfaceSimilarity: primary.finalSimilarity,
-      depthRepairApplied: primary.depthRepairApplied,
+      selectedCandidate: strategies[first.index].label,
+      selectedStrategy: strategies[first.index].id,
+      selectedSurfaceSimilarity: similarities[first.index],
+      finalSurfaceSimilarity: first.finalSimilarity,
+      depthRepairApplied: first.depthRepairApplied,
+      semanticGuardPassed: first.semanticGuardPassed,
+      qualityScore: first.score,
       preferenceExamplesUsed: Math.min(options.preferenceExamples?.length || 0, 3),
       preferenceSamplesProfiled: options.preferenceProfile?.sampleCount || 0,
       preferenceProfile: options.preferenceProfile || null,
       alternativesReturned: alternatives?.length || 0,
-      m5sKnowledgeMatches: m5sKnowledge.matches.map((entry) => ({
+      m5sKnowledgeMatches: options.politicalStyle ? m5sKnowledge.matches.map((entry) => ({
         id: entry.id,
         type: entry.type,
         title: entry.title,
         status: entry.status,
-      })),
-      m5sKnowledgeSourceIds: m5sKnowledge.sourceIds,
+      })) : [],
+      m5sKnowledgeSourceIds: options.politicalStyle ? m5sKnowledge.sourceIds : [],
       mode: options.mode,
       intensity: options.intensity || "media",
       platform: options.mode === "social" ? options.platform || null : null,
