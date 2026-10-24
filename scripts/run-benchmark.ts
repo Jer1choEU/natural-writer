@@ -36,14 +36,14 @@ const intensities = (process.env.BENCHMARK_INTENSITIES || "media")
     allIntensities.includes(value as (typeof allIntensities)[number])
   );
 
-const models = (process.env.BENCHMARK_MODELS || "gemini-3.5-flash-lite,gemini-3.5-flash,gemini-3.8-flash")
+const models = (process.env.BENCHMARK_MODELS || "claude-sonnet-5-5")
   .split(",")
   .map((model) => model.trim())
   .filter(Boolean);
 
 async function main() {
-  if (!process.env.GEMINI_API_KEY) {
-    throw new Error("GEMINI_API_KEY non configurata");
+  if (!process.env.ANTHROPIC_API_KEY) {
+    throw new Error("ANTHROPIC_API_KEY non configurata");
   }
 
   const limit = Number(process.env.BENCHMARK_LIMIT || "1");

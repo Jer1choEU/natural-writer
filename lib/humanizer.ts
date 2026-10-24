@@ -1,4 +1,7 @@
+import { generateClaudeText, defaultClaudeModel, defaultClaudeSemanticModel } from "@/lib/claude";
 import { getPresetRules, type StylePreset } from "@/lib/style-presets";
+import { extractClaimLedger, verifyAndRepair } from "@/lib/claim-ledger";
+import { planEditorialRevision } from "@/lib/editorial-plan";
 import { checkSemanticGuard, formatSemanticIssues } from "@/lib/semantic-guard";
 import { identifyEditorialFlags } from "@/lib/editorial-metrics";
 import { judgeRewrite } from "@/benchmarks/quality-judge";
@@ -37,7 +40,7 @@ export type HumanizeOptions = {
   politicalStyle?: boolean;
 };
 
-const defaultModel = process.env.GEMINI_MODEL || "gemini-3.5-flash-lite";
+const defaultModel = defaultClaudeModel;
 
 const antiTicRules = [
   "Evita aperture generiche come 'nel mondo di oggi', 'in un contesto in continua evoluzione', 'è importante sottolineare'.",
@@ -81,7 +84,9 @@ const candidateStrategies: Array<{ id: CandidateStrategy; label: string; rules: 
     label: "A",
     rules: [
       "Strategia candidata A: privilegia una vera ricostruzione sintattica.",
-      "Cambia soprattutto attacco delle frasi, verbo reggente, coordinazione/subordinazione e disposizione interna dei complementi.",
+      "Cambia davvero l'attacco delle frasi ripetitive, il verbo reggente e la coordinazione, mantenendo le stesse posizioni politiche.",
+      "Su testi composti da una frase per riga, limitarsi a riunire frasi identiche in cinque paragrafi NON è una riscrittura sufficiente.",
+      "Ricostruisci soprattutto i periodi meccanici, senza obbligarti a cambiare espressioni già naturali e precise.",
       "Conserva il lessico concettualmente preciso quando serve, ma evita di replicare la stessa struttura della frase originale.",
       "Mantieni chi propone o decide: non trasformare scuola, diritti o legalità nei soggetti che chiedono o esigono.",
       "Non forzare il cambiamento di una frase già riuscita.",
@@ -94,7 +99,10 @@ const candidateStrategies: Array<{ id: CandidateStrategy; label: string; rules: 
       "Strategia candidata B: privilegia naturalezza, voce e fluidità.",
       "Riscrivi come farebbe una persona che ha compreso il testo e lo riscrive senza guardare la formulazione originale parola per parola.",
       "Mantieni una distanza reale dall'originale, ma non sacrificare semplicità e spontaneità per essere diverso a tutti i costi.",
-      "Alleggerisci introduzioni burocratiche e usa verbi diretti.",
+      "Preferisci il soggetto che compie l'azione e il verbo diretto: non trasformare una frase naturale in una nominalizzazione passiva.",
+      "Evita formule come 'la distruzione dei materiali avviene tramite', 'l'orizzonte di riferimento', 'tale orientamento', 'a discapito' e 'progetto caldeggiato' quando l'originale è più semplice.",
+      "Non trasformare una gerarchia di priorità in un divieto o una condizione imposta da una legge.",
+      "Alleggerisci introduzioni burocratiche; la naturalezza viene prima della distanza superficiale.",
       "Se serve, unisci o dividi paragrafi senza perdere alcuna informazione.",
     ],
   },
@@ -348,6 +356,10 @@ function buildRewriteInstructions(options: HumanizeOptions, strategy?: Candidate
     "Non aggiungere informazioni, esempi, giudizi o dati non presenti nell'originale.",
     "Mantieni eventuali incertezze o cautele dell'originale: non renderle più forti o più deboli.",
     "Varia in modo naturale lunghezza e struttura delle frasi.",
+    "Scrivi come un italiano che spiega queste idee a una persona, non come un comunicato istituzionale: preferisci verbi attivi e parole comuni.",
+    "Non aumentare il registro: 'sostenuto' non va sostituito con 'caldeggiato', 'gestione' non deve automaticamente diventare 'trattamento'.",
+    "Le priorità della gerarchia europea non sono automaticamente divieti, condizioni giuridiche o interventi 'a discapito' di altre tecnologie.",
+    "Se il testo di partenza contiene tante frasi complete su righe separate, riunirle in paragrafi senza cambiare i passaggi rigidi NON basta.",
     "Correggi la punteggiatura quando migliora chiarezza e ritmo, anche se il lessico resta invariato.",
     "Usa le virgole per isolare correttamente incisi e complementi inseriti nel mezzo della frase, ma non aggiungerle in modo decorativo.",
     "Se un inciso come 'dietro sigle e numeri' o 'di fronte a certe testimonianze' interrompe il flusso della frase, valuta se racchiuderlo tra virgole.",
@@ -425,6 +437,8 @@ function buildReviewInstructions(options: HumanizeOptions) {
     "Correggi virgole mancanti intorno agli incisi quando servono alla leggibilità; evita però la virgola tra soggetto e verbo o tra verbo e complemento diretto.",
     "Quando una frase è troppo lunga, valuta un punto fermo invece di accumulare virgole.",
     "Rimuovi ridondanze residue e formule generiche.",
+    "Prima di consegnare, elimina nominalizzazioni e giri passivi introdotti: 'la distruzione ... avviene', 'l'orizzonte di riferimento', 'tale orientamento' e simili non sono più naturali di un verbo attivo.",
+    "Se la revisione ha semplicemente accorpato righe identiche in paragrafi, migliora davvero i passaggi ripetitivi senza inventare informazioni.",
     "Mantieni la modalità e il tono richiesti.",
     intensityRules(options.intensity),
     modeRules(options),
@@ -436,80 +450,7 @@ function buildReviewInstructions(options: HumanizeOptions) {
 }
 
 
-function getRetryDelayMs(status: number, errorText: string, attempt: number) {
-  const exponentialDelay = 1000 * 2 ** (attempt - 1);
-  if (status !== 429) return exponentialDelay;
-
-  const retryMatch =
-    errorText.match(/retry in\s+([0-9.]+)s/i) ||
-    errorText.match(/"retryDelay"\s*:\s*"([0-9.]+)s"/i);
-
-  const suggestedSeconds = retryMatch ? Number(retryMatch[1]) : 0;
-  if (!Number.isFinite(suggestedSeconds) || suggestedSeconds <= 0) {
-    return Math.max(exponentialDelay, 10000);
-  }
-
-  return Math.max(exponentialDelay, Math.ceil(suggestedSeconds * 1000) + 750);
-}
-
-async function generateText(instructions: string, input: string, selectedModel: string) {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    throw new Error("GEMINI_API_KEY non configurata");
-  }
-
-  const maxAttempts = 4;
-  let lastError: Error | null = null;
-
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent?key=${encodeURIComponent(apiKey)}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          systemInstruction: {
-            parts: [{ text: instructions }],
-          },
-          contents: [
-            {
-              role: "user",
-              parts: [{ text: input }],
-            },
-          ],
-        }),
-      }
-    );
-
-    if (response.ok) {
-      const data = await response.json();
-      const text =
-        data?.candidates?.[0]?.content?.parts
-          ?.map((part: { text?: string }) => part.text || "")
-          .join("")
-          .trim() || "";
-
-      if (!text) {
-        throw new Error("Gemini non ha restituito testo.");
-      }
-
-      return text;
-    }
-
-    const errorText = await response.text();
-    lastError = new Error(`Gemini API error ${response.status}: ${errorText}`);
-
-    if (![429, 500, 502, 503, 504].includes(response.status) || attempt === maxAttempts) {
-      throw lastError;
-    }
-
-    const delayMs = getRetryDelayMs(response.status, errorText, attempt);
-    await new Promise((resolve) => setTimeout(resolve, delayMs));
-  }
-
-  throw lastError || new Error("Gemini API error sconosciuto");
-}
-
+const generateText = generateClaudeText;
 
 type FinalizedCandidate = {
   text: string;
@@ -667,7 +608,15 @@ export async function rewriteFragment(
     model
   );
   const guard = checkSemanticGuard(fragment, candidate.trim(), locked);
-  return guard.valid ? candidate.trim() : fragment;
+  if (!guard.valid) return fragment;
+  const semanticModel = defaultClaudeSemanticModel;
+  try {
+    const ledger = await extractClaimLedger(fragment, semanticModel);
+    const result = await verifyAndRepair(fragment, candidate.trim(), ledger, semanticModel, locked);
+    return result.validated ? result.text : fragment;
+  } catch {
+    return fragment;
+  }
 }
 
 export async function humanizeText(text: string, options: HumanizeOptions) {
@@ -679,6 +628,29 @@ export async function humanizeText(text: string, options: HumanizeOptions) {
       derivePreferenceProfile(options.preferenceExamples || []),
   };
 
+
+  const semanticModel = defaultClaudeSemanticModel;
+  // The ledger is mandatory: never certify a draft when claim extraction fails.
+  const ledger = await extractClaimLedger(text, semanticModel).catch((error) => {
+    console.warn("Claim extraction unavailable; retaining source", error instanceof Error ? error.message : "unknown");
+    return null;
+  });
+  if (!ledger) {
+    return {
+      text,
+      alternatives: options.returnAlternatives ? [{
+        id: "A", text, similarity: 1, strategy: "original-preserved",
+        qualityScore: null, semanticGuardPassed: true, claimValidated: false,
+      }] : undefined,
+      meta: {
+        provider: "anthropic", model: selectedModel, stages: ["claim-ledger-unavailable", "safe-original-fallback"],
+        claimCount: 0, claimVerificationStatus: "not-verified",
+        semanticGuardPassed: true, qualityScore: null, alternativesReturned: 1,
+        mode: options.mode, intensity: options.intensity || "media",
+      },
+    };
+  }
+
   const m5sKnowledge = getM5SKnowledgeContext(text);
   const knowledgeContext = options.politicalStyle ? m5sKnowledge.context : "";
   const wordCount = text.trim().split(/\s+/).filter(Boolean).length;
@@ -686,27 +658,23 @@ export async function humanizeText(text: string, options: HumanizeOptions) {
   const detailedPath = wordCount > 180;
   const flags = identifyEditorialFlags(text);
 
-  const [analysis, semanticSkeleton] = await Promise.all([
-    detailedPath
-      ? generateText(
+  // Structured source claims supersede the old free-form semantic skeleton.
+  const semanticSkeleton = JSON.stringify(ledger.claims);
+  const analysis = detailedPath
+    ? await planEditorialRevision(text, options.mode, selectedModel)
+        .then((plan) => JSON.stringify(plan))
+        .catch(() => generateText(
           buildAnalysisInstructions(options),
           [
-            "TESTO DIVISO IN PARAGRAFI (solo per l'analisi, non aggiungere intestazioni all'output):",
-            numberedParagraphs(text),
+            "TESTO DIVISO IN PARAGRAFI:", numberedParagraphs(text),
             ...(knowledgeContext ? ["", knowledgeContext] : []),
             "PASSAGGI DA VALUTARE:",
             ...flags.map((flag) => flag.sentence + " — " + flag.reasons.join(", ")),
           ].join("\n"),
           selectedModel
-        )
-      : Promise.resolve(
-          flags.map((flag) => flag.sentence + ": " + flag.reasons.join(", ")).join("\n") ||
-          "Migliora solo i passaggi che ne hanno bisogno, preservando le formulazioni riuscite."
-        ),
-    fastPath
-      ? Promise.resolve("Preserva ogni fatto, citazione, negazione, ruolo e termine preciso.")
-      : generateText(buildSemanticSkeletonInstructions(options), text, selectedModel),
-  ]);
+        ))
+    : flags.map((flag) => flag.sentence + ": " + flag.reasons.join(", ")).join("\n") ||
+      "Migliora solo i passaggi che ne hanno bisogno, preservando le formulazioni riuscite.";
 
   const strategies = detailedPath ? candidateStrategies : candidateStrategies.slice(0, 2);
   const drafts = await Promise.all(
@@ -783,20 +751,49 @@ export async function humanizeText(text: string, options: HumanizeOptions) {
     });
   if (!ranked.length) throw new Error("Nessuna riscrittura generata.");
   const viable = ranked.filter((candidate) => candidate.assessment.eligible);
-  // Never pass off a judged unfaithful or artificial rewrite as an improvement.
-  const noSafeImprovement = viable.length === 0;
-  const first = viable[0] || {
+  // Quality alone cannot certify fidelity; independently check up to 3 drafts.
+  const verified: Array<(typeof ranked)[number] & { claimValidated: boolean; claimRepairApplied: boolean }> = [];
+  for (const candidate of viable.slice(0, 3)) {
+    const verification = await verifyAndRepair(
+      text, candidate.text, ledger, semanticModel, options.lockedTerms || []
+    );
+    if (!verification.validated) continue;
+    let accepted = { ...candidate, text: verification.text };
+    if (verification.repaired) {
+      const judged = await evaluateQuality(text, {
+        ...accepted, finalSimilarity: surfaceSimilarity(text, verification.text)
+      }, options);
+      const assessment = assessEditorialCandidate(text, verification.text, true, judged.quality);
+      if (!assessment.eligible) continue;
+      accepted = { ...accepted, quality: judged.quality, assessment };
+    }
+    verified.push({
+      ...accepted,
+      finalSimilarity: surfaceSimilarity(text, accepted.text),
+      claimValidated: true, claimRepairApplied: verification.repaired,
+    });
+  }
+  const noSafeImprovement = verified.length === 0;
+  if (noSafeImprovement) {
+    // Source-safe diagnostics only: never log the user's original or drafts.
+    console.warn("Natural Writer safe-original diagnostic", JSON.stringify({
+      claimCount: ledger.claims.length,
+      candidates: ranked.length,
+      viableCandidates: viable.length,
+      editorialReasons: ranked.map((candidate) => candidate.assessment.reason),
+      judgesAvailable: ranked.map((candidate) => candidate.quality !== null),
+      verifiedCandidates: verified.length,
+    }));
+  }
+  const first = verified[0] || {
     ...ranked[0],
-    text,
-    finalSimilarity: 1,
-    depthRepairApplied: false,
-    semanticGuardPassed: true,
-    semanticIssues: 0,
-    quality: null,
+    text, finalSimilarity: 1, depthRepairApplied: false,
+    semanticGuardPassed: true, semanticIssues: 0, quality: null,
+    claimValidated: false, claimRepairApplied: false,
     assessment: { eligible: true, score: null, reason: "judge-unavailable" as const },
   };
 
-  let second = viable.slice(1).find((candidate) =>
+  let second = verified.slice(1).find((candidate) =>
     sufficientlyDistinct(
       surfaceSimilarity(first.text, candidate.text),
       candidate.assessment.score, first.assessment.score
@@ -832,7 +829,10 @@ export async function humanizeText(text: string, options: HumanizeOptions) {
       const assessed = assessEditorialCandidate(
         text, contrasted.text, contrasted.semanticGuardPassed, judged.quality
       );
-      if (assessed.eligible && sufficientlyDistinct(
+      const verifiedContrast = assessed.eligible
+        ? await verifyAndRepair(text, contrasted.text, ledger, semanticModel, options.lockedTerms || [])
+        : null;
+      if (assessed.eligible && verifiedContrast?.validated && !verifiedContrast.repaired && sufficientlyDistinct(
         surfaceSimilarity(first.text, contrasted.text),
         assessed.score, first.assessment.score
       )) {
@@ -842,6 +842,8 @@ export async function humanizeText(text: string, options: HumanizeOptions) {
           initialRank: ranked.length,
           quality: judged.quality,
           assessment: assessed,
+          claimValidated: true,
+          claimRepairApplied: false,
         };
       }
     } catch (error) {
@@ -859,19 +861,21 @@ export async function humanizeText(text: string, options: HumanizeOptions) {
         strategy: strategies[candidate.index].id,
         qualityScore: candidate.assessment.score === null ? null : Number(candidate.assessment.score.toFixed(2)),
         semanticGuardPassed: candidate.semanticGuardPassed,
+        claimValidated: candidate.claimValidated,
       }))
     : undefined;
 
   const stages = [
-    ...(detailedPath ? ["analysis"] : []),
-    ...(!fastPath ? ["semantic-skeleton"] : []),
+    ...(detailedPath ? ["editorial-plan"] : []),
+    "claim-ledger",
     "adaptive-multi-candidate-rewrite",
     ...(detailedPath ? ["candidate-ranking"] : []),
     ...(!fastPath ? ["faithfulness-review"] : []),
     "deterministic-semantic-guard",
     "quality-ranking",
+    "independent-claim-verification",
   ];
-  if (chosen.some((candidate) => candidate.depthRepairApplied)) stages.push("targeted-repair");
+  if (chosen.some((candidate) => candidate.depthRepairApplied || candidate.claimRepairApplied)) stages.push("targeted-repair");
   if (noSafeImprovement) stages.push("safe-original-fallback");
   if (second && second.initialRank === ranked.length) stages.push("contrastive-alternative");
   if (options.preferenceExamples?.length) stages.push("preference-conditioning");
@@ -882,7 +886,7 @@ export async function humanizeText(text: string, options: HumanizeOptions) {
     text: first.text,
     alternatives,
     meta: {
-      provider: "gemini",
+      provider: "anthropic",
       model: selectedModel,
       stages,
       candidates: drafts.length,
@@ -892,6 +896,9 @@ export async function humanizeText(text: string, options: HumanizeOptions) {
       finalSurfaceSimilarity: first.finalSimilarity,
       depthRepairApplied: first.depthRepairApplied,
       semanticGuardPassed: first.semanticGuardPassed,
+      claimCount: ledger.claims.length,
+      claimVerificationStatus: first.claimValidated ? "validated" : "original-retained",
+      claimRepairApplied: first.claimRepairApplied,
       qualityScore: first.assessment.score,
       preferenceExamplesUsed: Math.min(options.preferenceExamples?.length || 0, 3),
       preferenceSamplesProfiled: options.preferenceProfile?.sampleCount || 0,

@@ -1,3 +1,5 @@
+import { generateClaudeJson, defaultClaudeJudgeModel } from "@/lib/claude";
+
 export type QualityJudgeResult = {
   fidelity: number;
   naturalness: number;
@@ -14,71 +16,27 @@ export type QualityJudgeResult = {
   notes: string[];
 };
 
-const judgeModel = process.env.GEMINI_JUDGE_MODEL || "gemini-3.5-flash-lite";
+const judgeModel = defaultClaudeJudgeModel;
 
-function getJudgeRetryDelayMs(status: number, errorText: string, attempt: number) {
-  const exponentialDelay = 1000 * 2 ** (attempt - 1);
-  if (status !== 429) return exponentialDelay;
-
-  const retryMatch =
-    errorText.match(/retry in\s+([0-9.]+)s/i) ||
-    errorText.match(/"retryDelay"\s*:\s*"([0-9.]+)s"/i);
-  const suggestedSeconds = retryMatch ? Number(retryMatch[1]) : 0;
-
-  if (!Number.isFinite(suggestedSeconds) || suggestedSeconds <= 0) {
-    return Math.max(exponentialDelay, 10000);
-  }
-
-  return Math.max(exponentialDelay, Math.ceil(suggestedSeconds * 1000) + 750);
-}
+const judgeFields = ["fidelity","naturalness","rhythm","specificity","semanticPrecision",
+  "concreteness","antiTics","semanticCoverage","structurePreservation","rewriteDepth","editorialGain","overall"];
+const judgeSchema = {
+  type: "object",
+  properties: {
+    ...Object.fromEntries(judgeFields.map((field) => [field, { type: "number" }])),
+    notes: { type: "array", items: { type: "string" } },
+  },
+  required: [...judgeFields,"notes"],
+  additionalProperties: false,
+};
 
 async function callJudge(prompt: string) {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) throw new Error("GEMINI_API_KEY non configurata");
-
-  let lastError: Error | null = null;
-
-  for (let attempt = 1; attempt <= 4; attempt++) {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${judgeModel}:generateContent?key=${encodeURIComponent(apiKey)}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ role: "user", parts: [{ text: prompt }] }],
-          generationConfig: {
-            responseMimeType: "application/json",
-            temperature: 0,
-          },
-        }),
-      }
-    );
-
-    if (response.ok) {
-      const data = await response.json();
-      const text =
-        data?.candidates?.[0]?.content?.parts
-          ?.map((part: { text?: string }) => part.text || "")
-          .join("")
-          .trim() || "";
-
-      if (!text) throw new Error("Judge Gemini senza risposta");
-      return JSON.parse(text);
-    }
-
-    const errorText = await response.text();
-    lastError = new Error(`Gemini judge error ${response.status}: ${errorText}`);
-
-    if (![429, 500, 502, 503, 504].includes(response.status) || attempt === 4) {
-      throw lastError;
-    }
-
-    await new Promise((resolve) =>
-      setTimeout(resolve, getJudgeRetryDelayMs(response.status, errorText, attempt))
-    );
-  }
-
-  throw lastError || new Error("Gemini judge error sconosciuto");
+  return generateClaudeJson<Record<string, unknown>>(
+    judgeModel,
+    "Sei un revisore indipendente. Restituisci esclusivamente il JSON richiesto nel prompt.",
+    prompt,
+    judgeSchema,
+  );
 }
 
 function clampScore(value: unknown) {
