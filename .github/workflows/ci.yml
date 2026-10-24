@@ -20,6 +20,7 @@ jobs:
       - run: npm run typecheck
       - run: npm run quality-check
       - run: npm run profile-check
+      - run: npm run learning-check
       - run: npm run knowledge-check
       - run: npm run coherence-check
       - run: npm run build
