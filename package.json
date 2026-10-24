@@ -13,6 +13,7 @@
     "profile-check": "tsx scripts/check-preference-profile.ts",
     "quality-check": "tsx scripts/check-editorial-quality.ts",
     "rewrite-quality-check": "tsx scripts/check-rewrite-quality.ts",
+    "claude-check": "tsx scripts/check-claude-adapter.ts",
     "claim-ledger-check": "tsx scripts/check-claim-ledger.ts",
     "learning-check": "tsx scripts/check-learning-profile.ts",
     "learning-store-check": "tsx scripts/check-learning-store.ts"
