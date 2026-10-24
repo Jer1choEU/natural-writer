@@ -21,6 +21,23 @@ type PreferenceRecord = {
 const STORAGE_KEY = "natural-writer-preferences-v1";
 const MAX_STORED_PREFERENCES = 50;
 const MAX_RECENT_EXAMPLES = 3;
+const MIGRATED_KEY = "natural-writer-migrated-to-cloud-v1";
+const PENDING_KEY = "natural-writer-pending-learning-v1";
+
+type LearningRecord = PreferenceRecord & { kind: "choice" | "edit"; mode: "social" | "natural" };
+
+function readPending(): LearningRecord[] {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(PENDING_KEY) || "[]");
+    return Array.isArray(parsed) ? parsed : [];
+  } catch { return []; }
+}
+
+function addPending(event: LearningRecord) {
+  const list = readPending();
+  localStorage.setItem(PENDING_KEY, JSON.stringify([...list, event].slice(-500)));
+}
+
 
 function readPreferences(): PreferenceRecord[] {
   if (typeof window === "undefined") return [];
@@ -53,12 +70,85 @@ export default function Home() {
   const [alternatives, setAlternatives] = useState<Alternative[]>([]);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [preferenceCount, setPreferenceCount] = useState(0);
+  const [storageMode, setStorageMode] = useState<"checking" | "cloud" | "local">("checking");
+  const [autoLearningEnabled, setAutoLearningEnabled] = useState(false);
+  const [generatedAlternatives, setGeneratedAlternatives] = useState<Alternative[]>([]);
+  const [trainingNotice, setTrainingNotice] = useState("");
+  const [trainingBusy, setTrainingBusy] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    setPreferenceCount(readPreferences().length);
+    let active = true;
+    async function initializeLearning() {
+      setPreferenceCount(readPreferences().length);
+      try {
+        const r = await fetch("/api/learning", { cache: "no-store" });
+        if (!r.ok) { if (active) setStorageMode("local"); return; }
+        let status = await r.json();
+        if (!active) return;
+        setStorageMode("cloud");
+        setAutoLearningEnabled(Boolean(status.enabled));
+
+        // Migrate legacy data only after server acknowledgement. Keep the
+        // original local copy as a safety backup; server fingerprints dedupe retries.
+        const old = readPreferences();
+        if (old.length > 0 && !localStorage.getItem(MIGRATED_KEY)) {
+          const migration = await fetch("/api/learning", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "migrate", events: old.map(e => ({
+              ...e, kind: "choice", mode: "general",
+            })) }),
+          });
+          if (migration.ok) localStorage.setItem(MIGRATED_KEY, "yes");
+          else setTrainingNotice("Importazione dei vecchi dati non completata: il backup locale è intatto.");
+        }
+        const pending = readPending();
+        if (pending.length) {
+          const allowed = pending.filter(event => event.kind === "choice" || status.enabled);
+          const remaining = pending.filter(event => !allowed.includes(event));
+          for (let i = 0; i < allowed.length; i += 50) {
+            const batch = allowed.slice(i, i + 50);
+            const response = await fetch("/api/learning", {
+              method: "POST", headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ action: "record", events: batch,
+                automatic: batch.some(e => e.kind === "edit") }),
+            });
+            if (!response.ok) remaining.push(...batch);
+          }
+          localStorage.setItem(PENDING_KEY, JSON.stringify(remaining));
+        }
+        const updated = await fetch("/api/learning", { cache: "no-store" });
+        if (updated.ok) status = await updated.json();
+        if (active) setPreferenceCount(status.count);
+      } catch {
+        if (active) {
+          setStorageMode("local");
+          setTrainingNotice("Memoria cloud non raggiungibile: conserviamo le preferenze nel browser.");
+        }
+      }
+    }
+    void initializeLearning();
+    return () => { active = false; };
   }, []);
+
+  async function saveCloudEvents(events: LearningRecord[], automatic = false): Promise<boolean> {
+    try {
+      const r = await fetch("/api/learning", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "record", events, automatic }),
+      });
+      if (!r.ok) throw new Error("Non è stato possibile confermare il salvataggio cloud.");
+      const data = await r.json();
+      setPreferenceCount(data.count);
+      return true;
+    } catch {
+      events.forEach(addPending);
+      setTrainingNotice("Salvataggio cloud in sospeso: le modifiche sono conservate localmente.");
+      return false;
+    }
+  }
+
 
   const canTransform = useMemo(() => input.trim().length > 0 && !loading, [input, loading]);
 
@@ -68,6 +158,7 @@ export default function Home() {
     setLoading(true);
     setError("");
     setAlternatives([]);
+    setGeneratedAlternatives([]);
     setSelectedIndex(null);
     setSelectedFragment(null);
     setFragmentError("");
@@ -106,8 +197,10 @@ export default function Home() {
 
       if (received.length >= 2) {
         setAlternatives(received.slice(0, 2));
+        setGeneratedAlternatives(received.slice(0, 2));
       } else if (typeof data.text === "string") {
         setAlternatives([{ id: "A", text: data.text }]);
+        setGeneratedAlternatives([{ id: "A", text: data.text }]);
       } else {
         throw new Error("Il motore non ha restituito una riscrittura valida.");
       }
