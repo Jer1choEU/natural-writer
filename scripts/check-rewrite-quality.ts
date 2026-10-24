@@ -1,4 +1,4 @@
-import { assessEditorialCandidate, introducedCliches, sufficientlyDistinct, templateOpeningCount } from "../lib/rewrite-quality";
+import { assessEditorialCandidate, introducedCliches, sufficientlyDistinct, templateOpeningCount, unchangedLongSentenceShare } from "../lib/rewrite-quality";
 import type { QualityJudgeResult } from "../benchmarks/quality-judge";
 
 function check(condition: unknown, message: string) {
@@ -59,4 +59,21 @@ check(!sufficientlyDistinct(0.85, 9, 9), "Near-duplicate A/B should be rejected"
 check(!sufficientlyDistinct(0.4, 6, 9), "Distinct but poor alternative should be rejected");
 check(sufficientlyDistinct(0.3, null, 8), "Unavailable judge should not prevent distinct A/B");
 
+const lineSource = Array.from({ length: 8 }, (_, index) =>
+  "Il Comune deve migliorare i servizi del quartiere " + (index + 1) + " senza aumentare i costi per i residenti.");
+const separateLines = lineSource.join("\n");
+const gluedLines = lineSource.join(" ");
+const genuinelyRewritten = lineSource.map((_, index) =>
+  "Senza aumentare i costi per i residenti, il Comune deve migliorare i servizi del quartiere " + (index + 1) + ".").join(" ");
+check(unchangedLongSentenceShare(separateLines, gluedLines) > 0.99,
+  "Moving unchanged sentences into paragraphs is a cosmetic near-copy");
+check(unchangedLongSentenceShare(separateLines, genuinelyRewritten) < 0.01,
+  "Syntactically rebuilt sentences should not count as verbatim copies");
+const cosmetic = assessEditorialCandidate(separateLines, gluedLines, true, quality);
+const genuine = assessEditorialCandidate(separateLines, genuinelyRewritten, true, quality);
+check(cosmetic.score !== null && genuine.score !== null && cosmetic.score < genuine.score,
+  "Paragraph-only copies should be ranked below genuine syntactic rewrites");
+check(introducedCliches("Il progetto è sostenuto dal sindaco.",
+  "L'orizzonte di riferimento è un progetto caldeggiato dal sindaco.") === 2,
+  "Unnecessarily bureaucratic vocabulary should be penalized");
 console.log("Rewrite editorial selection policy: OK");
