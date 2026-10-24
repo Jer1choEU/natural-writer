@@ -2,7 +2,7 @@
  * Offline schema / gate regression suite. These fixtures do NOT constitute
  * empirical LLM accuracy measurements; live A/B evaluation is a separate task.
  */
-import { parseLedger, parseVerification, sourceChunks, sourceExcerpt, extractClaimLedger, verifyAndRepair } from "../lib/claim-ledger";
+import { parseLedger, parseVerification, sourceChunks, sourceSegmentLedger, sourceExcerpt, extractClaimLedger, verifyAndRepair } from "../lib/claim-ledger";
 import { checkSemanticGuard } from "../lib/semantic-guard";
 import { parseEditorialPlan, splitEditorialParagraphs } from "../lib/editorial-plan";
 
@@ -90,6 +90,20 @@ assert(parsedOptional.claims[0].conditions.length === 0 && parsedOptional.claims
 rejects(() => parseLedger({ claims: [{ ...optionalMetadataClaim, source: "La combustione è obbligatoria." }] }, apostropheOriginal),
   "Unrelated source excerpts must still fail");
 
+
+const sentenceInput = "Si devono ridurre i rifiuti.\\nNon si possono inventare obiettivi.";
+const sentenceLedger = sourceSegmentLedger(sentenceInput);
+assert(sentenceLedger.claims.length === 2 &&
+  sentenceLedger.claims[1].source === "Non si possono inventare obiettivi.",
+  "Source sentence fallback must retain each literal sentence");
+assert(!parseVerification({
+  checks: sentenceLedger.claims.map((claim, i) => ({
+    id: claim.id, status: i ? "omitted" : "preserved",
+    explanation: "", targetExcerpt: "",
+  })),
+  addedClaims: [],
+}, sentenceLedger).valid, "Unverified omitted fallback source must fail");
+
 const original = "Il gruppo chiede più fondi. Gli iscritti propongono nuove misure.";
 const two = parseLedger({ claims: [
   claimFor("Il gruppo chiede più fondi."),
@@ -161,6 +175,13 @@ async function mockNetworkPipeline() {
     responses = [{ claims: [{ source, subject: "gruppo", action: "chiede", conditions: "invalid" }] }, rawLedger];
     const retryLedger = await extractClaimLedger(source, "gemini-3.5-flash-lite");
     assert(retryLedger.claims.length === 1, "Malformed extracted metadata must trigger one safe retry");
+    responses = [
+      { claims: [{ source: "Invented text", subject: "wrong", action: "invent" }] },
+      { claims: [{ source: "Invented text", subject: "wrong", action: "invent" }] },
+    ];
+    const sourceFallback = await extractClaimLedger(source, "gemini-3.5-flash-lite");
+    assert(sourceFallback.claims.length === 1 && sourceFallback.claims[0].source === source,
+      "Two malformed model extractions must retain anchored source sentences");
     responses = [rawLedger];
     const ledger = await extractClaimLedger(source, "gemini-3.5-flash-lite");
     assert(ledger.claims.length === 1, "Network extraction must produce source-anchored claims");
