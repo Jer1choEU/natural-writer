@@ -76,7 +76,7 @@ for (const [i, fixture] of fixtures.entries()) {
 const apostropheOriginal = "L’economia circolare richiede meno rifiuti.";
 const recovered = sourceExcerpt("L'economia circolare richiede meno rifiuti.", apostropheOriginal);
 assert(recovered === apostropheOriginal, "Curly apostrophe must resolve to exact original excerpt");
-const whitespaceOriginal = "Il Movimento sostiene la raccolta\\n  differenziata.";
+const whitespaceOriginal = "Il Movimento sostiene la raccolta\n  differenziata.";
 assert(sourceExcerpt("Il Movimento sostiene la raccolta differenziata.", whitespaceOriginal) === whitespaceOriginal,
   "Whitespace differences must preserve the exact source anchor");
 assert(sourceExcerpt("Il Movimento chiede nuovi inceneritori.", whitespaceOriginal) === "",
