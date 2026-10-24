@@ -1,4 +1,4 @@
-import { assessEditorialCandidate, introducedCliches, sufficientlyDistinct } from "../lib/rewrite-quality";
+import { assessEditorialCandidate, introducedCliches, sufficientlyDistinct, templateOpeningCount } from "../lib/rewrite-quality";
 import type { QualityJudgeResult } from "../benchmarks/quality-judge";
 
 function check(condition: unknown, message: string) {
@@ -13,10 +13,25 @@ const quality: QualityJudgeResult = {
   fidelity: 9, naturalness: 8.5, rhythm: 8, specificity: 8,
   semanticPrecision: 9, concreteness: 8, antiTics: 9,
   semanticCoverage: 9, structurePreservation: 9, rewriteDepth: 7,
-  overall: 8.5, notes: [],
+  overall: 8.5, editorialGain: 7, notes: [],
 };
 const accepted = assessEditorialCandidate(original, good, true, quality);
 check(accepted.eligible && accepted.score !== null, "Good faithful rewrite should be eligible");
+
+const noImprovement = assessEditorialCandidate(original, good, true, { ...quality, editorialGain: 2.5 });
+check(!noImprovement.eligible && noImprovement.reason === "naturalness",
+  "A paraphrase judged worse than its source should not be promoted");
+
+check(templateOpeningCount("In materia economica servono misure.\nSul piano sociale serve ascolto.\nLe famiglie chiedono tutele.") === 2,
+  "Identify bureaucratic starts at single-line paragraph boundaries");
+const formulaic = "In materia economica servono misure.\nSul piano sociale serve ascolto.";
+const better = "Servono misure economiche.\nLe politiche sociali richiedono ascolto.";
+const plainSource = "Servono misure economiche.\nServono interventi sociali.";
+const formulaicRating = assessEditorialCandidate(plainSource, formulaic, true, quality);
+const betterRating = assessEditorialCandidate(plainSource, better, true, quality);
+check(formulaicRating.score !== null && betterRating.score !== null &&
+  formulaicRating.score < betterRating.score,
+  "New formulaic openings should lower the score compared with natural phrasing");
 
 const drift = assessEditorialCandidate(original, poor, true, { ...quality, semanticPrecision: 6 });
 check(!drift.eligible && drift.reason === "fidelity", "Political stance drift should be rejected by the judge gate");
