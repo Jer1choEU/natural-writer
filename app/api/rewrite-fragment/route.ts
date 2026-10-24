@@ -5,8 +5,8 @@ export const runtime = "nodejs";
 
 export async function POST(request: Request) {
   try {
-    if (!process.env.GEMINI_API_KEY) {
-      return NextResponse.json({ error: "GEMINI_API_KEY non configurata." }, { status: 500 });
+    if (!process.env.ANTHROPIC_API_KEY) {
+      return NextResponse.json({ error: "ANTHROPIC_API_KEY non configurata." }, { status: 500 });
     }
     const body = await request.json();
     const fragment = typeof body.fragment === "string" ? body.fragment.trim() : "";
