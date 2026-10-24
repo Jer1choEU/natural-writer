@@ -2,6 +2,7 @@ import { getPresetRules, type StylePreset } from "@/lib/style-presets";
 import { checkSemanticGuard, formatSemanticIssues } from "@/lib/semantic-guard";
 import { identifyEditorialFlags } from "@/lib/editorial-metrics";
 import { judgeRewrite } from "@/benchmarks/quality-judge";
+import { assessEditorialCandidate, sufficientlyDistinct } from "@/lib/rewrite-quality";
 import { getM5SStyleRules } from "@/lib/m5s-style";
 import { getM5SKnowledgeContext } from "@/lib/m5s-knowledge";
 import {
@@ -82,6 +83,8 @@ const candidateStrategies: Array<{ id: CandidateStrategy; label: string; rules: 
       "Strategia candidata A: privilegia una vera ricostruzione sintattica.",
       "Cambia soprattutto attacco delle frasi, verbo reggente, coordinazione/subordinazione e disposizione interna dei complementi.",
       "Conserva il lessico concettualmente preciso quando serve, ma evita di replicare la stessa struttura della frase originale.",
+      "Mantieni chi propone o decide: non trasformare scuola, diritti o legalità nei soggetti che chiedono o esigono.",
+      "Non forzare il cambiamento di una frase già riuscita.",
     ],
   },
   {
@@ -91,6 +94,8 @@ const candidateStrategies: Array<{ id: CandidateStrategy; label: string; rules: 
       "Strategia candidata B: privilegia naturalezza, voce e fluidità.",
       "Riscrivi come farebbe una persona che ha compreso il testo e lo riscrive senza guardare la formulazione originale parola per parola.",
       "Mantieni una distanza reale dall'originale, ma non sacrificare semplicità e spontaneità per essere diverso a tutti i costi.",
+      "Alleggerisci introduzioni burocratiche e usa verbi diretti.",
+      "Se serve, unisci o dividi paragrafi senza perdere alcuna informazione.",
     ],
   },
   {
@@ -98,7 +103,7 @@ const candidateStrategies: Array<{ id: CandidateStrategy; label: string; rules: 
     label: "C",
     rules: [
       "Strategia candidata C: cerca una distanza superficiale più marcata mantenendo invariati significato e struttura logica.",
-      "Evita sequenze di parole identiche all'originale quando possono essere riformulate in modo altrettanto preciso e naturale.",
+      "Distinguiti per costruzione dei periodi, transizioni e ritmo, non con sinonimi inutili.",
       "Non usare sinonimi forzati: ottieni la distanza soprattutto ricostruendo le frasi come unità di senso.",
     ],
   },
@@ -291,7 +296,7 @@ function buildSemanticSkeletonInstructions(options: HumanizeOptions) {
     "Non riscrivere il testo e non proporre alternative stilistiche.",
     "Restituisci SOLO JSON valido e compatto.",
     "Il JSON deve contenere: paragraphs, facts, claims, anchors, logicalRelations, certainty, tone, mustNotAdd.",
-    "paragraphs deve descrivere, nello stesso ordine dell'originale, la funzione di ogni paragrafo e le idee che contiene.",
+    "paragraphs deve descrivere, nello stesso ordine dell'originale, la funzione di ogni paragrafo e le idee che contiene. È una lista di contenuti da preservare, NON un obbligo a mantenere il numero di paragrafi.",
     "facts deve includere fatti, nomi propri, numeri, date, luoghi, citazioni e riferimenti verificabili presenti nel testo.",
     "Tratta come fatti vincolanti anche ruoli, qualifiche, funzioni dei soggetti e il contenuto esatto delle azioni: non inferire sinonimi di ruolo o modalità operative non dichiarate.",
     "claims deve contenere tesi, giudizi, richieste, inviti e posizioni dell'autore senza rafforzarli o attenuarli.",
@@ -311,6 +316,8 @@ function buildRankingInstructions(options: HumanizeOptions) {
     "Verifica mentalmente l'equivalenza in entrambe le direzioni: tutto ciò che afferma l'originale deve essere recuperabile dalla riscrittura e tutto ciò che afferma la riscrittura deve essere supportato dall'originale.",
     "Poi valuta naturalezza, concretezza, voce, ritmo e precisione.",
     "Premia il miglioramento editoriale, non la distanza artificiale dalla superficie del testo.",
+    "Penalizza soggetti astratti personificati, slogan introdotti e formule più enfatiche dell'originale.",
+    "È una deriva semantica trasformare privilegiare il dialogo rispetto a una spesa in opporsi alla spesa, o attribuire una proposta a chi non l'ha formulata.",
     "La similarità superficiale è solo un indicatore: non premiarla o penalizzarla automaticamente.",
     "Preferisci differenze ottenute tramite nuova sintassi e nuova costruzione della frase, non tramite sinonimi ricercati o innaturali.",
     "Scarta una candidata se altera fatti, negazioni, causalità, soggetti, ruoli, qualifiche, responsabilità, azioni, inviti o intensità del giudizio, anche se è stilisticamente bella.",
@@ -337,7 +344,11 @@ function buildRewriteInstructions(options: HumanizeOptions, strategy?: Candidate
     "Usa due punti, punto e virgola e punto fermo solo quando rendono più leggibile il periodo; evita accumuli eccessivi.",
     "Usa lessico concreto e contestuale.",
     "Non correggere una voce personale solo perché è irregolare: correggi ciò che suona meccanico, non ciò che suona umano.",
-    "Conserva la macrostruttura del testo, ma non imitare la sintassi dell'originale frase per frase.",
+    "Conserva l'ordine delle idee, ma non il numero dei paragrafi o l'attacco ripetitivo di ogni sezione. Puoi unire o dividere paragrafi per migliorare la leggibilità.",
+    "Non perdere proposte, categorie di persone, condizioni e negazioni: la concisione non autorizza omissioni.",
+    "Mantieni l'agente delle azioni: una proposta del Movimento non diventa una richiesta della scuola.",
+    "Non rafforzare la posizione dell'autore: privilegiare X rispetto a Y non equivale automaticamente a opporsi a Y.",
+    "Se una frase è già limpida, meglio conservarla che sostituirla con una formula più artificiosa.",
     "Parafrasa per unità di senso: prima comprendi l'idea completa, poi esprimila di nuovo con una costruzione autonoma e naturale.",
     "Quando puoi scegliere tra due formulazioni equivalenti, preferisci quella realmente più naturale.",
     ...antiTicRules,
@@ -390,6 +401,9 @@ function buildReviewInstructions(options: HumanizeOptions) {
     "Penalizza e correggi formule come 'l'opera', 'la narrazione', 'il nodo centrale', 'si tratta di', 'è importante' o 'lavoro cinematografico' quando sostituiscono parole più semplici dell'originale senza un vantaggio reale.",
     "Se l'originale contiene un invito, un imperativo o una frase personale efficace, non trasformarlo in una raccomandazione impersonale.",
     "Controlla che il testo non sia diventato troppo levigato, simmetrico o prevedibile.",
+    "Evita personificazioni innaturali come la legalità chiama, la scuola chiede o i diritti esigono quando la fonte attribuisce la proposta a un soggetto politico.",
+    "Non trasformare una preferenza comparativa in una opposizione categorica.",
+    "Il numero di paragrafi può cambiare, a condizione di preservare la progressione delle idee.",
     "Se due frasi consecutive hanno struttura o ritmo troppo simili, rendile più naturali senza introdurre nuove informazioni.",
     "Verifica anche il problema opposto: se la bozza conserva troppe frasi quasi identiche all'originale, riformula le parti non protette cambiando realmente la costruzione sintattica, senza toccare le ancore semantiche.",
     "Per intensità media verifica che i passaggi problematici siano stati migliorati, senza alterare quelli già efficaci.",
