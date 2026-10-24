@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { requireLearningOwner, verifyLearningOrigin } from "@/lib/learning-auth";
 import {
   clearLearning, getLearningStatus, learningDatabaseConfigured,
-  recordLearningEvents, restorePreviousLearningProfile, setAutoLearning,
+  recordLearningEvents, restorePreviousLearningProfile, resumeAutomaticLearningProfile, setAutoLearning,
 } from "@/lib/learning-store";
 
 export const runtime = "nodejs";
@@ -68,6 +68,11 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "Modalità non valida." }, { status: 400 });
       }
       return NextResponse.json(await restorePreviousLearningProfile(owner, body.mode));
+    }
+    if (body.action === "resume") {
+      if (body.mode !== "social" && body.mode !== "natural")
+        return NextResponse.json({ error: "Modalità non valida." }, { status: 400 });
+      return NextResponse.json(await resumeAutomaticLearningProfile(owner, body.mode));
     }
     if (body.action === "clear") {
       if (body.confirm !== "ELIMINA") return NextResponse.json({ error: "Conferma richiesta." }, { status: 400 });
