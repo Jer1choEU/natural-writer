@@ -4,6 +4,7 @@
  */
 import { parseLedger, parseVerification, sourceChunks } from "../lib/claim-ledger";
 import { checkSemanticGuard } from "../lib/semantic-guard";
+import { parseEditorialPlan, splitEditorialParagraphs } from "../lib/editorial-plan";
 
 function assert(test: unknown, message: string): asserts test {
   if (!test) throw new Error(message);
@@ -101,4 +102,24 @@ assert(!checkSemanticGuard("Entro il 15 ottobre", "Entro il 16 ottobre").valid,
 assert(!checkSemanticGuard("Il M5S propone fondi", "Il partito propone fondi").valid,
   "Acronym regression must fail deterministic guard");
 
-console.log("Claim ledger schema, 30 fixtures, incomplete/duplicate checks, and basic guards: OK");
+
+const planSource = "La prima frase va bene.\n\nNel contesto attuale risulta fondamentale intervenire.";
+assert(splitEditorialParagraphs(planSource).length === 2, "Two input paragraphs expected");
+const plan = parseEditorialPlan({
+  paragraphs: [
+    { id: "P1", action: "keep", reason: "già chiaro" },
+    { id: "P2", action: "rebuild", reason: "formula stereotipata" },
+  ], transitions: [], repeatedOpenings: [], structureNotes: [],
+}, 2);
+assert(plan.paragraphs[0].action === "keep" && plan.paragraphs[1].action === "rebuild",
+  "Plan must support keep and rebuild decisions");
+rejects(() => parseEditorialPlan({
+  paragraphs: [{ id: "P1", action: "keep", reason: "ok" }],
+  transitions: [], repeatedOpenings: [], structureNotes: [],
+}, 2), "A plan missing a paragraph must fail");
+rejects(() => parseEditorialPlan({
+  paragraphs: [{ id: "P1", action: "delete", reason: "arbitrario" }],
+  transitions: [], repeatedOpenings: [], structureNotes: [],
+}, 1), "Unknown action must fail");
+
+console.log("Claim ledger schema, 30 fixtures, independent checks, guards and editorial plan: OK");
