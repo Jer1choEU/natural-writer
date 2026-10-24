@@ -15,6 +15,22 @@ export type EditorialPlan = {
 
 const allowed = new Set<EditorialAction>(["keep", "lighten", "rebuild"]);
 
+const editorialOutputSchema = {
+  type: "object",
+  properties: {
+    paragraphs: { type: "array", items: {
+      type: "object",
+      properties: { id: { type: "string" }, action: { type: "string", enum: ["keep","lighten","rebuild"] }, reason: { type: "string" } },
+      required: ["id","action","reason"], additionalProperties: false,
+    } },
+    transitions: { type: "array", items: { type: "string" } },
+    repeatedOpenings: { type: "array", items: { type: "string" } },
+    structureNotes: { type: "array", items: { type: "string" } },
+  },
+  required: ["paragraphs","transitions","repeatedOpenings","structureNotes"],
+  additionalProperties: false,
+};
+
 export function splitEditorialParagraphs(text: string): string[] {
   return text.replace(/\r\n?/g, "\n")
     .split(/\n\s*\n|\n(?=\p{Lu})/u)
@@ -73,6 +89,7 @@ export async function planEditorialRevision(
   const raw = await generateClaudeJson<unknown>(
     model, instructions,
     JSON.stringify({ paragraphs: paragraphs.map((text, i) => ({ id: "P" + (i + 1), text })) }),
+    editorialOutputSchema,
   );
   return parseEditorialPlan(raw, paragraphs.length);
 }
