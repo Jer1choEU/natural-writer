@@ -17,19 +17,19 @@ expect(!checkSemanticGuard(quote, 'Ha dichiarato: «Non siamo pronti».').valid,
 expect(checkSemanticGuard(quote, quote).valid, "Unchanged quote");
 // Political scope and degree: high-confidence negative regressions should be blocked.
 const limit = "Il programma vuole limitare il consumo di suolo.";
-check(!checkSemanticGuard(limit, "Il programma vuole arrestare il consumo di suolo.").valid,
+expect(!checkSemanticGuard(limit, "Il programma vuole arrestare il consumo di suolo.").valid,
   "Limiting soil consumption must not turn into stopping it");
-check(checkSemanticGuard(limit, "Il programma vuole ridurre il consumo di suolo.").valid,
+expect(checkSemanticGuard(limit, "Il programma vuole ridurre il consumo di suolo.").valid,
   "Equivalent lower-strength scope should be permitted");
-check(!checkSemanticGuard("La riduzione delle liste d'attesa è una priorità.",
+expect(!checkSemanticGuard("La riduzione delle liste d'attesa è una priorità.",
   "Abbattere le liste d'attesa è una priorità.").valid, "Do not intensify waiting-list policy");
-check(!checkSemanticGuard("Vogliamo la trasparenza delle istituzioni.",
+expect(!checkSemanticGuard("Vogliamo la trasparenza delle istituzioni.",
   "Vogliamo la massima trasparenza delle istituzioni.").valid, "Do not add absolute modifiers");
-check(!checkSemanticGuard("Serve una maggiore autonomia diplomatica.",
+expect(!checkSemanticGuard("Serve una maggiore autonomia diplomatica.",
   "L'Europa deve ritrovare autonomia diplomatica.").valid, "Do not invent lost autonomy");
-check(!checkSemanticGuard("Il Movimento privilegia il dialogo rispetto all'aumento delle spese militari.",
+expect(!checkSemanticGuard("Il Movimento privilegia il dialogo rispetto all'aumento delle spese militari.",
   "Il Movimento si oppone all'aumento delle spese militari.").valid, "Preference is not absolute opposition");
-check(checkSemanticGuard("Il piano vuole arrestare il consumo di suolo.",
+expect(checkSemanticGuard("Il piano vuole arrestare il consumo di suolo.",
   "L'obiettivo è arrestare il consumo di suolo.").valid, "Already strong language must not be blocked");
 
 const metrics = analyzeItalianText("Roma è una città. La vita va avanti.");
