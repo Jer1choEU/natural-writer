@@ -18,11 +18,24 @@ export type QualityJudgeResult = {
 
 const judgeModel = defaultClaudeJudgeModel;
 
+const judgeFields = ["fidelity","naturalness","rhythm","specificity","semanticPrecision",
+  "concreteness","antiTics","semanticCoverage","structurePreservation","rewriteDepth","editorialGain","overall"];
+const judgeSchema = {
+  type: "object",
+  properties: {
+    ...Object.fromEntries(judgeFields.map((field) => [field, { type: "number" }])),
+    notes: { type: "array", items: { type: "string" } },
+  },
+  required: [...judgeFields,"notes"],
+  additionalProperties: false,
+};
+
 async function callJudge(prompt: string) {
   return generateClaudeJson<Record<string, unknown>>(
     judgeModel,
     "Sei un revisore indipendente. Restituisci esclusivamente il JSON richiesto nel prompt.",
     prompt,
+    judgeSchema,
   );
 }
 
