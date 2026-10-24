@@ -91,7 +91,7 @@ rejects(() => parseLedger({ claims: [{ ...optionalMetadataClaim, source: "La com
   "Unrelated source excerpts must still fail");
 
 
-const sentenceInput = "Si devono ridurre i rifiuti.\\nNon si possono inventare obiettivi.";
+const sentenceInput = "Si devono ridurre i rifiuti.\nNon si possono inventare obiettivi.";
 const sentenceLedger = sourceSegmentLedger(sentenceInput);
 assert(sentenceLedger.claims.length === 2 &&
   sentenceLedger.claims[1].source === "Non si possono inventare obiettivi.",
