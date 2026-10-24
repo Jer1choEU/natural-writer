@@ -44,15 +44,15 @@ Il controllo finale confronta originale e bozza per ridurre alterazioni di signi
 
 ## Training stilistico
 
-Ogni scelta A/B può contribuire a un profilo stilistico aggregato.
+Ogni scelta A/B contribuisce al profilo stilistico. Se Auto-Learning è abilitato nella pagina Memoria, anche le correzioni manuali alle varianti utilizzate diventano esempi di training.
 
 Il training usa due livelli:
-- **profilo aggregato**: fino a 50 confronti vengono trasformati in segnali ricorrenti, come distanza dall'originale, concisione, ritmo delle frasi, semplicità lessicale e preferenze di punteggiatura;
+- **profilo aggregato**: con Turso collegato, tutti i confronti salvati contribuiscono ai segnali ricorrenti, come distanza dall'originale, concisione, ritmo delle frasi, semplicità lessicale e preferenze di punteggiatura;
 - **memoria recente**: gli ultimi 3 confronti vengono mantenuti come esempi diretti per dettagli di voce che le metriche non catturano.
 
 Il profilo è conservativo: una singola scelta ha peso basso e fedeltà semantica e naturalezza hanno sempre priorità.
 
-Per ora lo storico resta nel browser tramite `localStorage`; la persistenza account/server e la sincronizzazione tra dispositivi sono ancora da implementare. Anche le modifiche manuali alle alternative prima della scelta A/B alimentano il profilo.
+Se configurato, lo storico viene salvato permanentemente in Turso e sincronizzato tra dispositivi che accedono allo stesso account. Il vecchio localStorage viene migrato automaticamente e mantenuto come copia di sicurezza. Senza collegamento a Turso rimane disponibile il vecchio training locale fino a 50 preferenze. Gli account individuali sono ancora da implementare (attualmente esiste un unico login).
 
 ## Stack
 
@@ -69,6 +69,8 @@ Copia `.env.example` in `.env.local` e imposta:
 ```bash
 GEMINI_API_KEY=...
 GEMINI_MODEL=gemini-3.5-flash-lite
+TURSO_DATABASE_URL=
+TURSO_AUTH_TOKEN=
 ```
 
 La chiave viene letta solo lato server.
@@ -84,7 +86,7 @@ Poi apri `http://localhost:3000`.
 
 ## Stato
 
-🟡 **Beta interna funzionale.** Riscrittura con due modalità, confronto A/B, training stilistico aggregato, benchmark e knowledge base M5S sono operativi. Per il deploy serve `GEMINI_API_KEY`; la principale lacuna infrastrutturale rimasta è la persistenza del training tra dispositivi.
+🟡 **Beta interna funzionale.** Riscrittura con due modalità, confronto A/B, training stilistico aggregato, benchmark e knowledge base M5S sono operativi. Per il deploy serve `GEMINI_API_KEY`; la persistenza tra dispositivi richiede il collegamento delle credenziali Turso sul deployment.
 
 
 ## Regole qualitative
@@ -217,8 +219,22 @@ Il judge usa `GEMINI_JUDGE_MODEL` (default: `gemini-3.5-flash-lite`) e viene imp
 
 ### Limiti e costi
 
-Il controllo semantico deterministico non può garantire da solo l'equivalenza di tutte le affermazioni. I punteggi automatici non sono una misura certa della paternità umana. La pipeline usa più chiamate a Gemini (incluso il Judge, quando disponibile), quindi testo, intensità e numero di candidate incidono sulla quota. Manca ancora un grande benchmark italiano con valutazioni umane indipendenti. Il training resta locale al browser, senza sincronizzazione tra dispositivi.
+Il controllo semantico deterministico non può garantire da solo l'equivalenza di tutte le affermazioni. I punteggi automatici non sono una misura certa della paternità umana. La pipeline usa più chiamate a Gemini (incluso il Judge, quando disponibile), quindi testo, intensità e numero di candidate incidono sulla quota. Manca ancora un grande benchmark italiano con valutazioni umane indipendenti. Il training è persistente nel database quando Turso è collegato, con un fallback locale conservativo se la configurazione manca.
 
 ## Prossimo sviluppo in coda
 
 Training persistente e Auto-Learning controllato: vedere https://github.com/Jer1choEU/natural-writer/issues/3. Non ancora implementato: nessun database di training o processo automatico viene attivato da questo aggiornamento.
+
+
+## Memoria permanente e Auto-Learning (ottobre 2026)
+
+- Endpoint di memoria autenticati, storage libSQL/Turso con storico deduplicato, profilo cumulativo per modalità e versionamento.
+- Migrazione automatica del precedente training browser dopo conferma del database.
+- Apprendimento dalle correzioni usate, con consenso esplicito; nessun training automatico dai testi generati e non utilizzati.
+- Importazione di esempi autentici, esportazione e ripristino di backup JSON, rollback del profilo e cancellazione dei dati.
+- Cron giornaliero opzionale per backup compressi su Vercel Blob privato separato da Turso.
+- Due modalità Social e Naturale mantenute; stile M5S automatico.
+
+**Per abilitare il cloud:** collegare Turso al progetto Vercel, poi aprire la pagina /learning. Per attivare il backup automatico configurare anche Blob privato e CRON_SECRET. Nessuna credenziale viene fornita o creata dalla repository.
+
+Procedura completa: [docs/persistent-learning.md](docs/persistent-learning.md).

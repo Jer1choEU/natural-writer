@@ -4,6 +4,9 @@ import { AUTH_COOKIE, isValidAuthToken } from "@/lib/auth";
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // Cron endpoint authenticates separately with CRON_SECRET (never with browser cookies).
+  if (pathname === "/api/cron/learning-backup") return NextResponse.next();
+
   if (pathname === "/login" || pathname === "/api/login") {
     return NextResponse.next();
   }
