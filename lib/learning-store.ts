@@ -29,6 +29,7 @@ async function ready(): Promise<Client> {
     "CREATE TABLE IF NOT EXISTS learning_events (owner_id TEXT NOT NULL, event_id TEXT NOT NULL, kind TEXT NOT NULL, mode TEXT NOT NULL, original TEXT NOT NULL, preferred TEXT NOT NULL, rejected TEXT NOT NULL, weight REAL NOT NULL, features TEXT NOT NULL, created_at TEXT NOT NULL, fingerprint TEXT NOT NULL, PRIMARY KEY(owner_id, event_id), UNIQUE(owner_id, fingerprint))",
     "CREATE INDEX IF NOT EXISTS idx_learning_owner_mode ON learning_events(owner_id, mode, created_at)",
     "CREATE TABLE IF NOT EXISTS learning_profiles (owner_id TEXT NOT NULL, mode TEXT NOT NULL, version INTEGER NOT NULL, event_count INTEGER NOT NULL, profile_json TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY(owner_id, mode, version))",
+    "CREATE TABLE IF NOT EXISTS learning_pins (owner_id TEXT NOT NULL, mode TEXT NOT NULL, version INTEGER NOT NULL, PRIMARY KEY(owner_id, mode))",
   ], "write").then(() => {}).catch(error => { initialized = undefined; throw error; });
   await initialized;
   return db;
@@ -47,7 +48,7 @@ export function sanitizeEvent(value: unknown): LearningEvent | null {
   const preferred = typeof raw.preferred === "string" ? raw.preferred.trim() : "";
   const rejected = typeof raw.rejected === "string" ? raw.rejected.trim() : "";
   if (!preferred || preferred.length > 10000 || original.length > 10000 || rejected.length > 10000) return null;
-  if (kind === "choice" && (!original || !rejected || original === preferred)) return null;
+  if (kind === "choice" && (!original || !rejected)) return null;
   if (kind === "edit" && (!original || original === preferred)) return null;
   if (kind === "import" && preferred.length < 80) return null;
   return {
@@ -156,6 +157,7 @@ export async function getLearningStatus(owner: string) {
     sql: "SELECT COUNT(*) AS total, SUM(CASE WHEN kind='import' THEN 1 ELSE 0 END) AS imports FROM learning_events WHERE owner_id=?",
     args: [owner],
   });
+  const pins = await db.execute({ sql: "SELECT mode,version FROM learning_pins WHERE owner_id=?", args: [owner] });
   const snapshots = await db.execute({
     sql: "SELECT mode, MAX(version) AS version FROM learning_profiles WHERE owner_id=? GROUP BY mode",
     args: [owner],
@@ -166,6 +168,7 @@ export async function getLearningStatus(owner: string) {
     count: number(counts.rows[0]?.total),
     imports: number(counts.rows[0]?.imports),
     versions: Object.fromEntries(snapshots.rows.map(row => [String(row.mode), number(row.version)])),
+    pinned: Object.fromEntries(pins.rows.map(row => [String(row.mode), number(row.version)])),
   };
 }
 
@@ -175,7 +178,12 @@ export async function learningContext(owner: string, mode: LearningMode): Promis
   styleReferences: string[];
 }> {
   const db = await ready();
-  const snapshot = await lastSnapshot(owner, mode);
+  const pin = await db.execute({ sql: "SELECT version FROM learning_pins WHERE owner_id=? AND mode=?", args: [owner,mode] });
+  const pinned = pin.rows[0]?.version;
+  const selected = pinned
+    ? await db.execute({ sql: "SELECT profile_json FROM learning_profiles WHERE owner_id=? AND mode=? AND version=?",
+      args: [owner, mode, number(pinned)] }) : null;
+  const snapshot = selected?.rows[0] || await lastSnapshot(owner, mode);
   const built = snapshot ? JSON.parse(String(snapshot.profile_json)) as Awaited<ReturnType<typeof calculateProfile>>
     : await calculateProfile(owner, mode);
   const recent = await db.execute({
@@ -202,13 +210,18 @@ export async function restorePreviousLearningProfile(owner: string, mode: Learni
     args: [owner, mode],
   });
   if (latest.rows.length < 2) throw new Error("NO_OLDER_PROFILE");
-  const [current, previous] = latest.rows;
+  const [, previous] = latest.rows;
   await db.execute({
-    sql: "INSERT INTO learning_profiles(owner_id,mode,version,event_count,profile_json,created_at) VALUES(?,?,?,?,?,?)",
-    args: [owner, mode, number(current.version) + 1, number(previous.event_count),
-      String(previous.profile_json), new Date().toISOString()],
+    sql: "INSERT INTO learning_pins(owner_id,mode,version) VALUES(?,?,?) ON CONFLICT(owner_id,mode) DO UPDATE SET version=excluded.version",
+    args: [owner, mode, number(previous.version)],
   });
-  return { version: number(current.version) + 1 };
+  return { version: number(previous.version), pinned: true };
+}
+
+export async function resumeAutomaticLearningProfile(owner: string, mode: LearningMode) {
+  const db = await ready();
+  await db.execute({ sql: "DELETE FROM learning_pins WHERE owner_id=? AND mode=?", args: [owner,mode] });
+  return { pinned: false };
 }
 
 export async function exportLearning(owner: string) {
@@ -234,6 +247,7 @@ export async function clearLearning(owner: string) {
   await db.batch([
     { sql: "DELETE FROM learning_events WHERE owner_id=?", args: [owner] },
     { sql: "DELETE FROM learning_profiles WHERE owner_id=?", args: [owner] },
+    { sql: "DELETE FROM learning_pins WHERE owner_id=?", args: [owner] },
     { sql: "DELETE FROM learning_settings WHERE owner_id=?", args: [owner] },
   ], "write");
 }
