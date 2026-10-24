@@ -2,6 +2,7 @@ import { getPresetRules, type StylePreset } from "@/lib/style-presets";
 import { checkSemanticGuard, formatSemanticIssues } from "@/lib/semantic-guard";
 import { identifyEditorialFlags } from "@/lib/editorial-metrics";
 import { judgeRewrite } from "@/benchmarks/quality-judge";
+import { assessEditorialCandidate, sufficientlyDistinct } from "@/lib/rewrite-quality";
 import { getM5SStyleRules } from "@/lib/m5s-style";
 import { getM5SKnowledgeContext } from "@/lib/m5s-knowledge";
 import {
@@ -82,6 +83,8 @@ const candidateStrategies: Array<{ id: CandidateStrategy; label: string; rules: 
       "Strategia candidata A: privilegia una vera ricostruzione sintattica.",
       "Cambia soprattutto attacco delle frasi, verbo reggente, coordinazione/subordinazione e disposizione interna dei complementi.",
       "Conserva il lessico concettualmente preciso quando serve, ma evita di replicare la stessa struttura della frase originale.",
+      "Mantieni chi propone o decide: non trasformare scuola, diritti o legalità nei soggetti che chiedono o esigono.",
+      "Non forzare il cambiamento di una frase già riuscita.",
     ],
   },
   {
@@ -91,6 +94,8 @@ const candidateStrategies: Array<{ id: CandidateStrategy; label: string; rules: 
       "Strategia candidata B: privilegia naturalezza, voce e fluidità.",
       "Riscrivi come farebbe una persona che ha compreso il testo e lo riscrive senza guardare la formulazione originale parola per parola.",
       "Mantieni una distanza reale dall'originale, ma non sacrificare semplicità e spontaneità per essere diverso a tutti i costi.",
+      "Alleggerisci introduzioni burocratiche e usa verbi diretti.",
+      "Se serve, unisci o dividi paragrafi senza perdere alcuna informazione.",
     ],
   },
   {
@@ -98,7 +103,7 @@ const candidateStrategies: Array<{ id: CandidateStrategy; label: string; rules: 
     label: "C",
     rules: [
       "Strategia candidata C: cerca una distanza superficiale più marcata mantenendo invariati significato e struttura logica.",
-      "Evita sequenze di parole identiche all'originale quando possono essere riformulate in modo altrettanto preciso e naturale.",
+      "Distinguiti per costruzione dei periodi, transizioni e ritmo, non con sinonimi inutili.",
       "Non usare sinonimi forzati: ottieni la distanza soprattutto ricostruendo le frasi come unità di senso.",
     ],
   },
@@ -291,7 +296,7 @@ function buildSemanticSkeletonInstructions(options: HumanizeOptions) {
     "Non riscrivere il testo e non proporre alternative stilistiche.",
     "Restituisci SOLO JSON valido e compatto.",
     "Il JSON deve contenere: paragraphs, facts, claims, anchors, logicalRelations, certainty, tone, mustNotAdd.",
-    "paragraphs deve descrivere, nello stesso ordine dell'originale, la funzione di ogni paragrafo e le idee che contiene.",
+    "paragraphs deve descrivere, nello stesso ordine dell'originale, la funzione di ogni paragrafo e le idee che contiene. È una lista di contenuti da preservare, NON un obbligo a mantenere il numero di paragrafi.",
     "facts deve includere fatti, nomi propri, numeri, date, luoghi, citazioni e riferimenti verificabili presenti nel testo.",
     "Tratta come fatti vincolanti anche ruoli, qualifiche, funzioni dei soggetti e il contenuto esatto delle azioni: non inferire sinonimi di ruolo o modalità operative non dichiarate.",
     "claims deve contenere tesi, giudizi, richieste, inviti e posizioni dell'autore senza rafforzarli o attenuarli.",
@@ -311,6 +316,8 @@ function buildRankingInstructions(options: HumanizeOptions) {
     "Verifica mentalmente l'equivalenza in entrambe le direzioni: tutto ciò che afferma l'originale deve essere recuperabile dalla riscrittura e tutto ciò che afferma la riscrittura deve essere supportato dall'originale.",
     "Poi valuta naturalezza, concretezza, voce, ritmo e precisione.",
     "Premia il miglioramento editoriale, non la distanza artificiale dalla superficie del testo.",
+    "Penalizza soggetti astratti personificati, slogan introdotti e formule più enfatiche dell'originale.",
+    "È una deriva semantica trasformare privilegiare il dialogo rispetto a una spesa in opporsi alla spesa, o attribuire una proposta a chi non l'ha formulata.",
     "La similarità superficiale è solo un indicatore: non premiarla o penalizzarla automaticamente.",
     "Preferisci differenze ottenute tramite nuova sintassi e nuova costruzione della frase, non tramite sinonimi ricercati o innaturali.",
     "Scarta una candidata se altera fatti, negazioni, causalità, soggetti, ruoli, qualifiche, responsabilità, azioni, inviti o intensità del giudizio, anche se è stilisticamente bella.",
@@ -337,7 +344,11 @@ function buildRewriteInstructions(options: HumanizeOptions, strategy?: Candidate
     "Usa due punti, punto e virgola e punto fermo solo quando rendono più leggibile il periodo; evita accumuli eccessivi.",
     "Usa lessico concreto e contestuale.",
     "Non correggere una voce personale solo perché è irregolare: correggi ciò che suona meccanico, non ciò che suona umano.",
-    "Conserva la macrostruttura del testo, ma non imitare la sintassi dell'originale frase per frase.",
+    "Conserva l'ordine delle idee, ma non il numero dei paragrafi o l'attacco ripetitivo di ogni sezione. Puoi unire o dividere paragrafi per migliorare la leggibilità.",
+    "Non perdere proposte, categorie di persone, condizioni e negazioni: la concisione non autorizza omissioni.",
+    "Mantieni l'agente delle azioni: una proposta del Movimento non diventa una richiesta della scuola.",
+    "Non rafforzare la posizione dell'autore: privilegiare X rispetto a Y non equivale automaticamente a opporsi a Y.",
+    "Se una frase è già limpida, meglio conservarla che sostituirla con una formula più artificiosa.",
     "Parafrasa per unità di senso: prima comprendi l'idea completa, poi esprimila di nuovo con una costruzione autonoma e naturale.",
     "Quando puoi scegliere tra due formulazioni equivalenti, preferisci quella realmente più naturale.",
     ...antiTicRules,
@@ -390,6 +401,9 @@ function buildReviewInstructions(options: HumanizeOptions) {
     "Penalizza e correggi formule come 'l'opera', 'la narrazione', 'il nodo centrale', 'si tratta di', 'è importante' o 'lavoro cinematografico' quando sostituiscono parole più semplici dell'originale senza un vantaggio reale.",
     "Se l'originale contiene un invito, un imperativo o una frase personale efficace, non trasformarlo in una raccomandazione impersonale.",
     "Controlla che il testo non sia diventato troppo levigato, simmetrico o prevedibile.",
+    "Evita personificazioni innaturali come la legalità chiama, la scuola chiede o i diritti esigono quando la fonte attribuisce la proposta a un soggetto politico.",
+    "Non trasformare una preferenza comparativa in una opposizione categorica.",
+    "Il numero di paragrafi può cambiare, a condizione di preservare la progressione delle idee.",
     "Se due frasi consecutive hanno struttura o ritmo troppo simili, rendile più naturali senza introdurre nuove informazioni.",
     "Verifica anche il problema opposto: se la bozza conserva troppe frasi quasi identiche all'originale, riformula le parti non protette cambiando realmente la costruzione sintattica, senza toccare le ancore semantiche.",
     "Per intensità media verifica che i passaggi problematici siano stati migliorati, senza alterare quelli già efficaci.",
@@ -607,7 +621,7 @@ async function evaluateQuality(
     );
     return {
       quality: result,
-      score: result.overall * 0.6 + result.fidelity * 0.2 + result.semanticPrecision * 0.2,
+      score: result.overall, // Final scoring is calculated by assessEditorialCandidate.
     };
   } catch {
     // An unavailable judge must not make the editor unusable.
@@ -738,24 +752,88 @@ export async function humanizeText(text: string, options: HumanizeOptions) {
       ...candidate,
       index: candidateOrder[index],
       initialRank: index,
-      score: assessments[index].score,
       quality: assessments[index].quality,
+      assessment: assessEditorialCandidate(
+        text, candidate.text, candidate.semanticGuardPassed, assessments[index].quality
+      ),
     }))
     .sort((a, b) => {
-      if (a.semanticGuardPassed !== b.semanticGuardPassed) return a.semanticGuardPassed ? -1 : 1;
-      if (a.score !== null && b.score !== null && a.score !== b.score) return b.score - a.score;
+      if (a.assessment.eligible !== b.assessment.eligible) {
+        return a.assessment.eligible ? -1 : 1;
+      }
+      if (a.assessment.score !== null && b.assessment.score !== null &&
+          a.assessment.score !== b.assessment.score) {
+        return b.assessment.score - a.assessment.score;
+      }
       return a.initialRank - b.initialRank;
     });
-  const first = ranked[0];
-  if (!first) throw new Error("Nessuna riscrittura generata.");
+  if (!ranked.length) throw new Error("Nessuna riscrittura generata.");
+  const viable = ranked.filter((candidate) => candidate.assessment.eligible);
+  // Never pass off a judged unfaithful or artificial rewrite as an improvement.
+  const noSafeImprovement = viable.length === 0;
+  const first = viable[0] || {
+    ...ranked[0],
+    text,
+    finalSimilarity: 1,
+    depthRepairApplied: false,
+    semanticGuardPassed: true,
+    semanticIssues: 0,
+    quality: null,
+    assessment: { eligible: true, score: null, reason: "judge-unavailable" as const },
+  };
 
-  // Choose a useful alternative, not another nearly identical copy.
-  const others = ranked.slice(1);
-  const distinct = others.find((candidate) =>
-    surfaceSimilarity(first.text, candidate.text) < 0.72 &&
-    (candidate.score === null || first.score === null || candidate.score >= first.score - 1.5)
+  let second = viable.slice(1).find((candidate) =>
+    sufficientlyDistinct(
+      surfaceSimilarity(first.text, candidate.text),
+      candidate.assessment.score, first.assessment.score
+    )
   );
-  const second = distinct || others[0];
+
+  // One focused attempt if candidates are near-duplicates, never a fake A/B.
+  // Failure of this optional path must not break the successful first rewrite.
+  if (options.returnAlternatives && !second && !noSafeImprovement && wordCount > 60) {
+    try {
+      const contrastiveDraft = await generateText(
+        [
+          "Proponi una seconda versione editorialmente diversa dalla prima, ma fedele.",
+          "Ricomponi periodi e paragrafi: cambia la costruzione, non le posizioni o i fatti.",
+          "Evita sinonimi decorativi, metafore, personificazioni e frasi ad effetto.",
+          "Conserva tutte le informazioni, le attribuzioni e il grado di certezza.",
+          "Non peggiorare frasi già naturali solo per produrre differenza.",
+          modeRules(options), getPresetRules(options.preset), buildPreferenceRules(options),
+          "Restituisci solo la seconda versione finale.",
+        ].join("\n"),
+        [
+          "ORIGINALE:", text, "OSSATURA SEMANTICA:", semanticSkeleton,
+          "PRIMA VERSIONE DA DIFFERENZIARE:", first.text,
+        ].join("\n\n"),
+        selectedModel
+      );
+      const contrasted = await finalizeDraft(
+        text, semanticSkeleton, contrastiveDraft,
+        surfaceSimilarity(text, contrastiveDraft), options, selectedModel, knowledgeContext
+      );
+      const judged = await evaluateQuality(text, contrasted, options);
+      const assessed = assessEditorialCandidate(
+        text, contrasted.text, contrasted.semanticGuardPassed, judged.quality
+      );
+      if (assessed.eligible && sufficientlyDistinct(
+        surfaceSimilarity(first.text, contrasted.text),
+        assessed.score, first.assessment.score
+      )) {
+        second = {
+          ...contrasted,
+          index: 1,
+          initialRank: ranked.length,
+          quality: judged.quality,
+          assessment: assessed,
+        };
+      }
+    } catch (error) {
+      console.warn("Optional contrastive alternative unavailable", error);
+    }
+  }
+
   const chosen = options.returnAlternatives && second ? [first, second] : [first];
 
   const alternatives = options.returnAlternatives
@@ -764,7 +842,7 @@ export async function humanizeText(text: string, options: HumanizeOptions) {
         text: candidate.text,
         similarity: candidate.finalSimilarity,
         strategy: strategies[candidate.index].id,
-        qualityScore: candidate.score === null ? null : Number(candidate.score.toFixed(2)),
+        qualityScore: candidate.assessment.score === null ? null : Number(candidate.assessment.score.toFixed(2)),
         semanticGuardPassed: candidate.semanticGuardPassed,
       }))
     : undefined;
@@ -779,6 +857,8 @@ export async function humanizeText(text: string, options: HumanizeOptions) {
     "quality-ranking",
   ];
   if (chosen.some((candidate) => candidate.depthRepairApplied)) stages.push("targeted-repair");
+  if (noSafeImprovement) stages.push("safe-original-fallback");
+  if (second && second.initialRank === ranked.length) stages.push("contrastive-alternative");
   if (options.preferenceExamples?.length) stages.push("preference-conditioning");
   if (options.preferenceProfile?.sampleCount) stages.push("style-profile-conditioning");
   if (options.politicalStyle && m5sKnowledge.matches.length) stages.push("m5s-knowledge-conditioning");
@@ -797,7 +877,7 @@ export async function humanizeText(text: string, options: HumanizeOptions) {
       finalSurfaceSimilarity: first.finalSimilarity,
       depthRepairApplied: first.depthRepairApplied,
       semanticGuardPassed: first.semanticGuardPassed,
-      qualityScore: first.score,
+      qualityScore: first.assessment.score,
       preferenceExamplesUsed: Math.min(options.preferenceExamples?.length || 0, 3),
       preferenceSamplesProfiled: options.preferenceProfile?.sampleCount || 0,
       preferenceProfile: options.preferenceProfile || null,

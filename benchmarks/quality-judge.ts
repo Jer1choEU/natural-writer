@@ -106,6 +106,10 @@ Assegna un punteggio da 0 a 10 per:
 - semanticCoverage: conserva tutte le informazioni, negazioni, relazioni causali, inviti e sfumature dell'originale senza omissioni;
 - structurePreservation: conserva ordine delle idee, funzione dei paragrafi e architettura argomentativa richiesta, anche se cambia la sintassi;
 - rewriteDepth: misura quanto la formulazione è stata realmente ricostruita invece di limitarsi a punteggiatura, piccoli sinonimi o spostamenti cosmetici. Non premiare la distanza se produce artificiosità o deriva semantica.
+- Non attribuire richieste o proposte a un soggetto diverso da quello originale: «la scuola chiede fondi» non è equivalente a «il Movimento propone fondi per la scuola».
+- Non interpretare una preferenza comparativa come opposizione categorica: «privilegia il negoziato rispetto alle spese militari» NON equivale necessariamente a «si oppone alle spese militari».
+- Penalizza formule introdotte inutilmente come «gioca un ruolo chiave», «una priorità fondamentale» o personificazioni come «la legalità chiama».
+- Valuta anche se la riscrittura costituisce un miglioramento reale in naturalezza e precisione rispetto al testo di partenza; cambiare solo sinonimi non è un miglioramento.
 
 Intensità richiesta: ${intensity}.
 
