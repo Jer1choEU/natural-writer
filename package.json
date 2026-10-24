@@ -12,7 +12,8 @@
     "coherence-check": "tsx scripts/check-m5s-coherence.ts",
     "profile-check": "tsx scripts/check-preference-profile.ts",
     "quality-check": "tsx scripts/check-editorial-quality.ts",
-    "learning-check": "tsx scripts/check-learning-profile.ts"
+    "learning-check": "tsx scripts/check-learning-profile.ts",
+    "learning-store-check": "tsx scripts/check-learning-store.ts"
   },
   "dependencies": {
     "next": "15.5.7",
