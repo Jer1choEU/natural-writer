@@ -2,7 +2,7 @@
  * Offline schema / gate regression suite. These fixtures do NOT constitute
  * empirical LLM accuracy measurements; live A/B evaluation is a separate task.
  */
-import { parseLedger, parseVerification, sourceChunks } from "../lib/claim-ledger";
+import { parseLedger, parseVerification, sourceChunks, extractClaimLedger, verifyAndRepair } from "../lib/claim-ledger";
 import { checkSemanticGuard } from "../lib/semantic-guard";
 import { parseEditorialPlan, splitEditorialParagraphs } from "../lib/editorial-plan";
 
@@ -122,4 +122,67 @@ rejects(() => parseEditorialPlan({
   transitions: [], repeatedOpenings: [], structureNotes: [],
 }, 1), "Unknown action must fail");
 
-console.log("Claim ledger schema, 30 fixtures, independent checks, guards and editorial plan: OK");
+async function mockNetworkPipeline() {
+  const fetchBefore = globalThis.fetch;
+  const keyBefore = process.env.GEMINI_API_KEY;
+  const source = "Il gruppo chiede più fondi.";
+  const rewrite = "Più fondi sono richiesti dal gruppo.";
+  const rawLedger = { claims: [claimFor(source)] };
+  let responses: unknown[] = [];
+  let count = 0;
+  try {
+    process.env.GEMINI_API_KEY = "test-only-not-a-secret";
+    globalThis.fetch = (async () => {
+      count++;
+      const body = responses.shift();
+      if (!body) return new Response("unavailable", { status: 503 });
+      return new Response(JSON.stringify({
+        candidates: [{ content: { parts: [{ text: JSON.stringify(body) }] } }],
+      }), { status: 200, headers: { "Content-Type": "application/json" } });
+    }) as typeof fetch;
+    responses = [rawLedger];
+    const ledger = await extractClaimLedger(source, "gemini-3.5-flash-lite");
+    assert(ledger.claims.length === 1, "Network extraction must produce source-anchored claims");
+    responses = [{
+      checks: [{ id: "C1", status: "preserved", explanation: "", targetExcerpt: "" }],
+      addedClaims: [],
+    }];
+    const safe = await verifyAndRepair(source, rewrite, ledger, "gemini-3.5-flash-lite");
+    assert(safe.validated && safe.text === rewrite, "Verified semantic rewrite must pass");
+    responses = [{
+      checks: [{ id: "C1", status: "omitted", explanation: "Proposta omessa", targetExcerpt: "" }],
+      addedClaims: [],
+    }];
+    const unsafe = await verifyAndRepair(source, "Il gruppo ha parlato.", ledger, "gemini-3.5-flash-lite");
+    assert(!unsafe.validated && unsafe.text === source, "Unrepairable omitted claim must retain source");
+    responses = [{
+      checks: [{ id: "C1", status: "preserved", explanation: "", targetExcerpt: "" }],
+      addedClaims: ["Nessun dettaglio è confermato"],
+    }];
+    const invented = await verifyAndRepair(source, "Il gruppo chiede più fondi, che sono stati approvati.", ledger, "gemini-3.5-flash-lite");
+    assert(!invented.validated && invented.text === source, "Additional claims must retain source");
+    responses = [{
+      checks: [{ id: "C1", status: "altered", explanation: "Quantità invertita", targetExcerpt: "meno fondi" }],
+      addedClaims: [],
+    }, { replacement: "maggiori finanziamenti" }, {
+      checks: [{ id: "C1", status: "preserved", explanation: "", targetExcerpt: "" }],
+      addedClaims: [],
+    }];
+    const corrected = await verifyAndRepair(source, "Il gruppo chiede meno fondi.", ledger, "gemini-3.5-flash-lite");
+    assert(corrected.validated && corrected.repaired &&
+      corrected.text === "Il gruppo chiede maggiori finanziamenti.",
+      "Unique excerpt correction must be rechecked and kept");
+    // A failed model response must never be interpreted as a passed verifier.
+    responses = [];
+    const failing = await verifyAndRepair(source, rewrite, ledger, "gemini-3.5-flash-lite");
+    assert(!failing.validated && failing.text === source, "Model outage must retain source");
+    assert(count >= 7, "Mocked Gemini calls were not performed");
+  } finally {
+    globalThis.fetch = fetchBefore;
+    if (keyBefore === undefined) delete process.env.GEMINI_API_KEY;
+    else process.env.GEMINI_API_KEY = keyBefore;
+  }
+}
+mockNetworkPipeline()
+  .then(() => console.log("Claim ledger 30 fixtures, editorial plan and mocked Gemini pipeline: OK"))
+  .catch((error) => { console.error(error); process.exitCode = 1; });
