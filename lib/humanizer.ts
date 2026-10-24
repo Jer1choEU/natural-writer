@@ -1,4 +1,5 @@
 import { getPresetRules, type StylePreset } from "@/lib/style-presets";
+import { extractClaimLedger, verifyAndRepair } from "@/lib/claim-ledger";
 import { checkSemanticGuard, formatSemanticIssues } from "@/lib/semantic-guard";
 import { identifyEditorialFlags } from "@/lib/editorial-metrics";
 import { judgeRewrite } from "@/benchmarks/quality-judge";
@@ -679,6 +680,29 @@ export async function humanizeText(text: string, options: HumanizeOptions) {
       derivePreferenceProfile(options.preferenceExamples || []),
   };
 
+
+  const semanticModel = process.env.GEMINI_SEMANTIC_MODEL || process.env.GEMINI_JUDGE_MODEL || selectedModel;
+  // The ledger is mandatory: never certify a draft when claim extraction fails.
+  const ledger = await extractClaimLedger(text, semanticModel).catch((error) => {
+    console.warn("Claim extraction unavailable; retaining source", error instanceof Error ? error.message : "unknown");
+    return null;
+  });
+  if (!ledger) {
+    return {
+      text,
+      alternatives: options.returnAlternatives ? [{
+        id: "A", text, similarity: 1, strategy: "original-preserved",
+        qualityScore: null, semanticGuardPassed: true, claimValidated: false,
+      }] : undefined,
+      meta: {
+        provider: "gemini", model: selectedModel, stages: ["claim-ledger-unavailable", "safe-original-fallback"],
+        claimCount: 0, claimVerificationStatus: "not-verified",
+        semanticGuardPassed: true, qualityScore: null, alternativesReturned: 1,
+        mode: options.mode, intensity: options.intensity || "media",
+      },
+    };
+  }
+
   const m5sKnowledge = getM5SKnowledgeContext(text);
   const knowledgeContext = options.politicalStyle ? m5sKnowledge.context : "";
   const wordCount = text.trim().split(/\s+/).filter(Boolean).length;
@@ -686,27 +710,21 @@ export async function humanizeText(text: string, options: HumanizeOptions) {
   const detailedPath = wordCount > 180;
   const flags = identifyEditorialFlags(text);
 
-  const [analysis, semanticSkeleton] = await Promise.all([
-    detailedPath
-      ? generateText(
-          buildAnalysisInstructions(options),
-          [
-            "TESTO DIVISO IN PARAGRAFI (solo per l'analisi, non aggiungere intestazioni all'output):",
-            numberedParagraphs(text),
-            ...(knowledgeContext ? ["", knowledgeContext] : []),
-            "PASSAGGI DA VALUTARE:",
-            ...flags.map((flag) => flag.sentence + " — " + flag.reasons.join(", ")),
-          ].join("\n"),
-          selectedModel
-        )
-      : Promise.resolve(
-          flags.map((flag) => flag.sentence + ": " + flag.reasons.join(", ")).join("\n") ||
-          "Migliora solo i passaggi che ne hanno bisogno, preservando le formulazioni riuscite."
-        ),
-    fastPath
-      ? Promise.resolve("Preserva ogni fatto, citazione, negazione, ruolo e termine preciso.")
-      : generateText(buildSemanticSkeletonInstructions(options), text, selectedModel),
-  ]);
+  // Structured source claims supersede the old free-form semantic skeleton.
+  const semanticSkeleton = JSON.stringify(ledger.claims);
+  const analysis = detailedPath
+    ? await generateText(
+        buildAnalysisInstructions(options),
+        [
+          "TESTO DIVISO IN PARAGRAFI:", numberedParagraphs(text),
+          ...(knowledgeContext ? ["", knowledgeContext] : []),
+          "PASSAGGI DA VALUTARE:",
+          ...flags.map((flag) => flag.sentence + " — " + flag.reasons.join(", ")),
+        ].join("\n"),
+        selectedModel
+      )
+    : flags.map((flag) => flag.sentence + ": " + flag.reasons.join(", ")).join("\n") ||
+      "Migliora solo i passaggi che ne hanno bisogno, preservando le formulazioni riuscite.";
 
   const strategies = detailedPath ? candidateStrategies : candidateStrategies.slice(0, 2);
   const drafts = await Promise.all(
@@ -783,20 +801,38 @@ export async function humanizeText(text: string, options: HumanizeOptions) {
     });
   if (!ranked.length) throw new Error("Nessuna riscrittura generata.");
   const viable = ranked.filter((candidate) => candidate.assessment.eligible);
-  // Never pass off a judged unfaithful or artificial rewrite as an improvement.
-  const noSafeImprovement = viable.length === 0;
-  const first = viable[0] || {
+  // Quality alone cannot certify fidelity; independently check up to 3 drafts.
+  const verified: Array<(typeof ranked)[number] & { claimValidated: boolean; claimRepairApplied: boolean }> = [];
+  for (const candidate of viable.slice(0, 3)) {
+    const verification = await verifyAndRepair(
+      text, candidate.text, ledger, semanticModel, options.lockedTerms || []
+    );
+    if (!verification.validated) continue;
+    let accepted = { ...candidate, text: verification.text };
+    if (verification.repaired) {
+      const judged = await evaluateQuality(text, {
+        ...accepted, finalSimilarity: surfaceSimilarity(text, verification.text)
+      }, options);
+      const assessment = assessEditorialCandidate(text, verification.text, true, judged.quality);
+      if (!assessment.eligible) continue;
+      accepted = { ...accepted, quality: judged.quality, assessment };
+    }
+    verified.push({
+      ...accepted,
+      finalSimilarity: surfaceSimilarity(text, accepted.text),
+      claimValidated: true, claimRepairApplied: verification.repaired,
+    });
+  }
+  const noSafeImprovement = verified.length === 0;
+  const first = verified[0] || {
     ...ranked[0],
-    text,
-    finalSimilarity: 1,
-    depthRepairApplied: false,
-    semanticGuardPassed: true,
-    semanticIssues: 0,
-    quality: null,
+    text, finalSimilarity: 1, depthRepairApplied: false,
+    semanticGuardPassed: true, semanticIssues: 0, quality: null,
+    claimValidated: false, claimRepairApplied: false,
     assessment: { eligible: true, score: null, reason: "judge-unavailable" as const },
   };
 
-  let second = viable.slice(1).find((candidate) =>
+  let second = verified.slice(1).find((candidate) =>
     sufficientlyDistinct(
       surfaceSimilarity(first.text, candidate.text),
       candidate.assessment.score, first.assessment.score
@@ -832,7 +868,10 @@ export async function humanizeText(text: string, options: HumanizeOptions) {
       const assessed = assessEditorialCandidate(
         text, contrasted.text, contrasted.semanticGuardPassed, judged.quality
       );
-      if (assessed.eligible && sufficientlyDistinct(
+      const verifiedContrast = assessed.eligible
+        ? await verifyAndRepair(text, contrasted.text, ledger, semanticModel, options.lockedTerms || [])
+        : null;
+      if (assessed.eligible && verifiedContrast?.validated && !verifiedContrast.repaired && sufficientlyDistinct(
         surfaceSimilarity(first.text, contrasted.text),
         assessed.score, first.assessment.score
       )) {
@@ -842,6 +881,8 @@ export async function humanizeText(text: string, options: HumanizeOptions) {
           initialRank: ranked.length,
           quality: judged.quality,
           assessment: assessed,
+          claimValidated: true,
+          claimRepairApplied: false,
         };
       }
     } catch (error) {
@@ -859,19 +900,21 @@ export async function humanizeText(text: string, options: HumanizeOptions) {
         strategy: strategies[candidate.index].id,
         qualityScore: candidate.assessment.score === null ? null : Number(candidate.assessment.score.toFixed(2)),
         semanticGuardPassed: candidate.semanticGuardPassed,
+        claimValidated: candidate.claimValidated,
       }))
     : undefined;
 
   const stages = [
     ...(detailedPath ? ["analysis"] : []),
-    ...(!fastPath ? ["semantic-skeleton"] : []),
+    "claim-ledger",
     "adaptive-multi-candidate-rewrite",
     ...(detailedPath ? ["candidate-ranking"] : []),
     ...(!fastPath ? ["faithfulness-review"] : []),
     "deterministic-semantic-guard",
     "quality-ranking",
+    "independent-claim-verification",
   ];
-  if (chosen.some((candidate) => candidate.depthRepairApplied)) stages.push("targeted-repair");
+  if (chosen.some((candidate) => candidate.depthRepairApplied || candidate.claimRepairApplied)) stages.push("targeted-repair");
   if (noSafeImprovement) stages.push("safe-original-fallback");
   if (second && second.initialRank === ranked.length) stages.push("contrastive-alternative");
   if (options.preferenceExamples?.length) stages.push("preference-conditioning");
@@ -892,6 +935,9 @@ export async function humanizeText(text: string, options: HumanizeOptions) {
       finalSurfaceSimilarity: first.finalSimilarity,
       depthRepairApplied: first.depthRepairApplied,
       semanticGuardPassed: first.semanticGuardPassed,
+      claimCount: ledger.claims.length,
+      claimVerificationStatus: first.claimValidated ? "validated" : "original-retained",
+      claimRepairApplied: first.claimRepairApplied,
       qualityScore: first.assessment.score,
       preferenceExamplesUsed: Math.min(options.preferenceExamples?.length || 0, 3),
       preferenceSamplesProfiled: options.preferenceProfile?.sampleCount || 0,
