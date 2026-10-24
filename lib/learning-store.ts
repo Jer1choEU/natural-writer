@@ -11,14 +11,15 @@ let client: Client | undefined;
 let initialized: Promise<void> | undefined;
 
 export function learningDatabaseConfigured() {
-  return Boolean(process.env.TURSO_DATABASE_URL && process.env.TURSO_AUTH_TOKEN);
+  const url = process.env.TURSO_DATABASE_URL;
+  return Boolean(url && (url.startsWith("file:") || process.env.TURSO_AUTH_TOKEN));
 }
 
 function database(): Client {
   if (!learningDatabaseConfigured()) throw new Error("LEARNING_DB_NOT_CONFIGURED");
-  return client ||= createClient({
-    url: process.env.TURSO_DATABASE_URL!,
-    authToken: process.env.TURSO_AUTH_TOKEN!,
+  const url = process.env.TURSO_DATABASE_URL!;
+  return client ||= createClient(url.startsWith("file:") ? { url } : {
+    url, authToken: process.env.TURSO_AUTH_TOKEN!,
   });
 }
 
