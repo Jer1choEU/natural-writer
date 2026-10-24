@@ -272,20 +272,30 @@ function buildPreferenceRules(options: HumanizeOptions) {
   ].filter(Boolean).join("\n\n");
 }
 
+function numberedParagraphs(text: string): string {
+  const paragraphs = text.replace(/\r\n?/g, "\n")
+    .split(/\n\s*\n|\n(?=[A-ZÀ-Ü])/u)
+    .map((part) => part.trim()).filter(Boolean);
+  return paragraphs.map((part, i) => "PARAGRAFO " + (i + 1) + ": " + part).join("\n\n");
+}
+
 function buildAnalysisInstructions(options: HumanizeOptions) {
   return [
     "Analizza il testo come un editor umano esperto.",
     "Individua rigidità, ripetizioni, frasi troppo uniformi, transizioni meccaniche, formule generiche, tono impersonale e passaggi che sembrano costruiti più per essere ordinati che naturali.",
     "Segnala anche eventuali tic stilistici: simmetrie troppo perfette, enumerazioni artificiali, conclusioni automatiche, abuso di avverbi enfatici, nominalizzazioni, eccesso di due punti o trattini.",
     "Prima di proporre modifiche, individua le ancore semantiche: fatti, concetti precisi, termini chiave, grado di certezza, tono e rapporti logici che non devono cambiare.",
-    "Per ogni paragrafo ricostruisci mentalmente la sua ossatura: quali idee contiene e in quale ordine. Proteggi questa ossatura, non la formulazione letterale.",
-    "Per intensità media, individua come riformulare realmente la maggior parte delle frasi non banali cambiandone la costruzione senza alterare l'ordine delle idee o il lessico concettualmente indispensabile.",
+    "Per OGNI paragrafo numerato indica una sola decisione editoriale: CONSERVA (gia naturale e preciso), ALLEGGERISCI (ridondante/burocratico), oppure RICOSTRUISCI (attacco, sintassi o ritmo meccanico).",
+    "Per ogni decisione indica in pochissime parole perché: non inventare problemi per giustificare una riscrittura.",
+    "Individua inoltre i passaggi vicini con attacchi ripetitivi e proponi eventuali accorpamenti editoriali SOLO dove rimangano tutte le affermazioni.",
+    "Proteggi sempre l'ordine logico e l'agente della proposta, non necessariamente l'impaginazione.",
+    "Per intensità media, modifica ciò che va migliorato. Le frasi gia efficaci non richiedono riscrittura e la distanza lessicale non è un obiettivo.",
     "Tratta come segnali d'allarme formule più editoriali o astratte dell'originale, come 'l'opera', 'la narrazione', 'il nodo centrale', 'si tratta di', 'è importante', 'lavoro cinematografico', quando il testo di partenza usa parole più semplici.",
     "Non giudicare se il testo sia stato scritto da una IA e non cercare di eludere sistemi di rilevazione.",
     `Modalità richiesta: ${options.mode}.`,
     `Intensità: ${options.intensity || "media"}.`,
     ...(options.politicalStyle ? [getM5SStyleRules()] : []),
-    "Restituisci un piano di riscrittura molto conciso, massimo 8 punti, senza riscrivere ancora il testo.",
+    "Restituisci una riga molto breve per paragrafo numerato e una riga finale sugli attacchi ripetitivi. Non riscrivere ancora il testo.",
   ].join(" ");
 }
 
@@ -349,7 +359,9 @@ function buildRewriteInstructions(options: HumanizeOptions, strategy?: Candidate
     "Mantieni l'agente delle azioni: una proposta del Movimento non diventa una richiesta della scuola.",
     "Non rafforzare la posizione dell'autore: privilegiare X rispetto a Y non equivale automaticamente a opporsi a Y.",
     "Se una frase è già limpida, meglio conservarla che sostituirla con una formula più artificiosa.",
-    "Parafrasa per unità di senso: prima comprendi l'idea completa, poi esprimila di nuovo con una costruzione autonoma e naturale.",
+    "Riscrivi per unità di senso seguendo il piano editoriale: CONSERVA quando l'originale è già naturale, ALLEGGERISCI se è prolisso, RICOSTRUISCI se è meccanico.",
+    "Sostituisci i tanti attacchi tematici fotocopia con costruzioni dirette o transizioni necessarie, senza introdurre slogan.",
+    "Non aumentare mai gli obiettivi: limitare non è arrestare, ridurre non è azzerare, trasparenza non significa massima trasparenza.",
     "Quando puoi scegliere tra due formulazioni equivalenti, preferisci quella realmente più naturale.",
     ...antiTicRules,
     intensityRules(options.intensity),
@@ -407,6 +419,8 @@ function buildReviewInstructions(options: HumanizeOptions) {
     "Se due frasi consecutive hanno struttura o ritmo troppo simili, rendile più naturali senza introdurre nuove informazioni.",
     "Verifica anche il problema opposto: se la bozza conserva troppe frasi quasi identiche all'originale, riformula le parti non protette cambiando realmente la costruzione sintattica, senza toccare le ancore semantiche.",
     "Per intensità media verifica che i passaggi problematici siano stati migliorati, senza alterare quelli già efficaci.",
+    "Chiediti se il lettore preferirebbe davvero questa bozza all'originale: se una modifica è solo un sinonimo decorativo o una formula più ingessata, annullala.",
+    "Controlla ogni grado di intensità: limitare/ridurre non diventa arrestare/azzerare; autonomia maggiore non presume che quella precedente sia perduta.",
     "Esegui un passaggio finale dedicato alla punteggiatura: controlla incisi, subordinate, coordinazioni, domande, due punti e pause interne.",
     "Correggi virgole mancanti intorno agli incisi quando servono alla leggibilità; evita però la virgola tra soggetto e verbo o tra verbo e complemento diretto.",
     "Quando una frase è troppo lunga, valuta un punto fermo invece di accumulare virgole.",
@@ -677,8 +691,8 @@ export async function humanizeText(text: string, options: HumanizeOptions) {
       ? generateText(
           buildAnalysisInstructions(options),
           [
-            "TESTO:",
-            text,
+            "TESTO DIVISO IN PARAGRAFI (solo per l'analisi, non aggiungere intestazioni all'output):",
+            numberedParagraphs(text),
             ...(knowledgeContext ? ["", knowledgeContext] : []),
             "PASSAGGI DA VALUTARE:",
             ...flags.map((flag) => flag.sentence + " — " + flag.reasons.join(", ")),
@@ -799,6 +813,7 @@ export async function humanizeText(text: string, options: HumanizeOptions) {
           "Ricomponi periodi e paragrafi: cambia la costruzione, non le posizioni o i fatti.",
           "Evita sinonimi decorativi, metafore, personificazioni e frasi ad effetto.",
           "Conserva tutte le informazioni, le attribuzioni e il grado di certezza.",
+          "Migliora il ritmo eliminando attacchi ricorrenti come 'in materia', 'sul piano', 'nel settore' e simili, non sostituendoli con nuovi cliché.",
           "Non peggiorare frasi già naturali solo per produrre differenza.",
           modeRules(options), getPresetRules(options.preset), buildPreferenceRules(options),
           "Restituisci solo la seconda versione finale.",
