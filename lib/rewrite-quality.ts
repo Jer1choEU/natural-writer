@@ -28,6 +28,22 @@ export function introducedCliches(original: string, rewritten: string): number {
   return cliches.filter((phrase) => output.includes(phrase) && !source.includes(phrase)).length;
 }
 
+
+/**
+ * Opening templates are tracked at paragraph boundaries rather than across
+ * the entire text. This is a soft penalty, not a paragraph-count target.
+ */
+const boilerplateOpening = /^(?:in (?:materia|ambito|politica) |nel settore |nelle relazioni |sul (?:piano|fronte|terreno) |per quanto riguarda |il programma (?:prevede|propone)|l'obiettivo (?:complessivo|finale)|la transizione ecologica (?:gioca|occupa|richiede))/u;
+
+export function templateOpeningCount(text: string): number {
+  return text.toLocaleLowerCase("it")
+    .replace(/[’‘]/g, "'")
+    .split(/\n\s*\n|\n(?=\p{Lu})/u)
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .filter((part) => boilerplateOpening.test(part)).length;
+}
+
 export function assessEditorialCandidate(
   original: string,
   rewritten: string,
@@ -42,20 +58,23 @@ export function assessEditorialCandidate(
   if (Math.min(quality.fidelity, quality.semanticPrecision, quality.semanticCoverage) < 7.2) {
     return { eligible: false, score: null, reason: "fidelity" };
   }
-  if (quality.naturalness < 5.5 || quality.concreteness < 5) {
+  if (quality.naturalness < 5.5 || quality.concreteness < 5 || quality.editorialGain < 4) {
     return { eligible: false, score: null, reason: "naturalness" };
   }
 
   // Coverage was previously absent from the selection score. Reweight it
   // alongside naturalness, accuracy and the judgment of overall editorial gain.
-  const score = quality.overall * 0.17
-    + quality.fidelity * 0.17
-    + quality.semanticPrecision * 0.19
-    + quality.semanticCoverage * 0.19
-    + quality.naturalness * 0.17
-    + quality.concreteness * 0.06
-    + quality.antiTics * 0.05
-    - introducedCliches(original, rewritten) * 0.55;
+  const newBoilerplate = Math.max(0, templateOpeningCount(rewritten) - templateOpeningCount(original));
+  const score = quality.overall * 0.12
+    + quality.fidelity * 0.15
+    + quality.semanticPrecision * 0.16
+    + quality.semanticCoverage * 0.16
+    + quality.naturalness * 0.13
+    + quality.concreteness * 0.05
+    + quality.antiTics * 0.04
+    + quality.editorialGain * 0.19
+    - introducedCliches(original, rewritten) * 0.55
+    - newBoilerplate * 0.2;
   return { eligible: true, score: Number(score.toFixed(3)), reason: "ok" };
 }
 
