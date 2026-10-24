@@ -30,7 +30,7 @@ const quoted = (text: string) => {
 };
 
 const acronyms = (text: string) =>
-  text.match(/(?<![\p{L}\p{N}])[\p{Lu}]{2,}[\p{Lu}\d]*(?![\p{L}\p{N}])/gu) || [];
+  text.match(/(?<![\p{L}\p{N}])[\p{Lu}][\p{Lu}\d]*[\p{Lu}\d](?![\p{L}\p{N}])/gu) || [];
 
 const differences = (original: string[], rewritten: string[]) => {
   const remaining = [...rewritten];
