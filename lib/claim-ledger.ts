@@ -171,7 +171,7 @@ export async function extractClaimLedger(original: string, model: string): Promi
   const claims: Claim[] = [];
   for (const chunk of sourceChunks(original)) {
     const response = await structuredGemini<unknown>(
-      model, extractionRules, "<DATA>\n" + chunk + "\n</DATA>",
+      model, extractionRules, JSON.stringify({ sourceText: chunk }),
     );
     const parsed = parseLedger(response, chunk);
     for (const claim of parsed.claims) claims.push({ ...claim, id: "C" + (claims.length + 1) });
@@ -228,8 +228,7 @@ export async function verifyClaimLedger(
 ): Promise<SemanticVerification> {
   const response = await structuredGemini<unknown>(
     model, verificationRules,
-    "<LEDGER_DATA>\n" + JSON.stringify(ledger.claims) + "\n</LEDGER_DATA>\n" +
-    "<REWRITE_DATA>\n" + candidate + "\n</REWRITE_DATA>",
+    JSON.stringify({ claims: ledger.claims, rewrittenText: candidate }),
   );
   return parseVerification(response, ledger);
 }
