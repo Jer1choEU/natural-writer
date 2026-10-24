@@ -33,9 +33,9 @@ function cleanPreferenceExamples(value: unknown): PreferenceExample[] {
 
 export async function POST(request: Request) {
   try {
-    if (!process.env.GEMINI_API_KEY) {
+    if (!process.env.ANTHROPIC_API_KEY) {
       return NextResponse.json(
-        { error: "GEMINI_API_KEY non configurata sul server." },
+        { error: "ANTHROPIC_API_KEY non configurata sul server." },
         { status: 500 }
       );
     }
