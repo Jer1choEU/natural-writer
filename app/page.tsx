@@ -133,6 +133,9 @@ export default function Home() {
   }, []);
 
   async function saveCloudEvents(events: LearningRecord[], automatic = false): Promise<boolean> {
+    // Journal locally before starting the network request, so closing the tab
+    // during a slow write does not lose a confirmed preference.
+    events.forEach(addPending);
     try {
       const r = await fetch("/api/learning", {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -140,10 +143,16 @@ export default function Home() {
       });
       if (!r.ok) throw new Error("Non è stato possibile confermare il salvataggio cloud.");
       const data = await r.json();
+      const savedKeys = new Set(events.map(event => [event.kind, event.mode, event.createdAt,
+        event.original, event.preferred, event.rejected].join("|")));
+      const remaining = readPending().filter(event => !savedKeys.has([
+        event.kind, event.mode, event.createdAt, event.original,
+        event.preferred, event.rejected,
+      ].join("|")));
+      localStorage.setItem(PENDING_KEY, JSON.stringify(remaining));
       setPreferenceCount(data.count);
       return true;
     } catch {
-      events.forEach(addPending);
       setTrainingNotice("Salvataggio cloud in sospeso: le modifiche sono conservate localmente.");
       return false;
     }
