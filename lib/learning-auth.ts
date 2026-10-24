@@ -5,8 +5,8 @@ import { AUTH_COOKIE, isValidAuthToken } from "@/lib/auth";
 /** Current deployment has one credential pair. All sessions of this login share one owner.
  * Future independent accounts should replace this with an authenticated immutable user ID. */
 export function configuredLearningOwnerId(): string {
-  if (!process.env.AUTH_USERNAME) throw new Error("ACCOUNT_NOT_CONFIGURED");
-  return createHash("sha256").update("natural-writer-owner:" + process.env.AUTH_USERNAME).digest("hex");
+  // Stable across credential changes. Future multi-account auth will supply its own immutable user ID.
+  return createHash("sha256").update("natural-writer-owner:" + (process.env.LEARNING_OWNER_ID || "primary")).digest("hex");
 }
 
 export async function requireLearningOwner(): Promise<string> {
