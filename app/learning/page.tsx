@@ -8,6 +8,7 @@ type Status = {
   count: number;
   imports: number;
   versions: Record<string, number>;
+  pinned: Record<string, number>;
 };
 
 const BACKUP_KEY = "natural-writer-preferences-v1";
@@ -74,6 +75,11 @@ export default function LearningPage() {
     if (!window.confirm("Ripristinare il profilo stilistico precedente per " + modeToRestore + "?")) return;
     const result = await send({ action: "restore", mode: modeToRestore });
     if (result) setMessage("Versione stilistica precedente ripristinata.");
+  }
+
+  async function resume(modeToResume: "social" | "natural") {
+    const result = await send({ action: "resume", mode: modeToResume });
+    if (result) setMessage("Apprendimento del profilo " + modeToResume + " ripreso.");
   }
 
   async function erase() {
@@ -152,6 +158,8 @@ export default function LearningPage() {
               <a className="learningAction" href="/api/learning/export">Scarica backup JSON</a>
               <button disabled={busy} onClick={() => void restore("social")}>Ripristina Social</button>
               <button disabled={busy} onClick={() => void restore("natural")}>Ripristina Naturale</button>
+              {status?.pinned?.social ? <button disabled={busy} onClick={() => void resume("social")}>Riprendi Social</button> : null}
+              {status?.pinned?.natural ? <button disabled={busy} onClick={() => void resume("natural")}>Riprendi Naturale</button> : null}
               <button disabled={busy} className="learningDelete" onClick={() => void erase()}>Elimina tutti i dati</button>
             </div>
           </section>
