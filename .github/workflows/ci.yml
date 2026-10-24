@@ -1,0 +1,25 @@
+name: Quality checks
+
+on:
+  push:
+    branches:
+      - main
+      - feature/quality-humanizer-v2
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm install --no-audit --no-fund
+      - run: npm run typecheck
+      - run: npm run quality-check
+      - run: npm run profile-check
+      - run: npm run knowledge-check
+      - run: npm run coherence-check
+      - run: npm run build
