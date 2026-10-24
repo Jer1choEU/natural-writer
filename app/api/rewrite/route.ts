@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { analyzeItalianText } from "@/lib/editorial-metrics";
+import { requireLearningOwner } from "@/lib/learning-auth";
+import { learningContext, learningDatabaseConfigured } from "@/lib/learning-store";
 import {
   humanizeText,
   type HumanizeOptions,
@@ -52,7 +54,23 @@ export async function POST(request: Request) {
       );
     }
 
-    const preferenceExamples = cleanPreferenceExamples(body.preferenceExamples);
+    let preferenceExamples = cleanPreferenceExamples(body.preferenceExamples);
+    let savedProfile: HumanizeOptions["preferenceProfile"];
+    let styleReferences: string[] = [];
+
+    // Source of truth is the server once Turso is connected. Browser data is only
+    // a fallback during setup or a temporary cloud outage.
+    if (learningDatabaseConfigured()) {
+      try {
+        const owner = await requireLearningOwner();
+        const saved = await learningContext(owner, body.mode === "natural" ? "natural" : "social");
+        preferenceExamples = saved.examples;
+        savedProfile = saved.profile;
+        styleReferences = saved.styleReferences;
+      } catch (storageError) {
+        console.error("Learning context unavailable, using local fallback", storageError);
+      }
+    }
 
     // Keep the public interface intentionally simple. M5S style is always enabled.
     const mode: HumanizeOptions["mode"] = body.mode === "natural" ? "natural" : "social";
@@ -66,6 +84,8 @@ export async function POST(request: Request) {
       cta: false,
       question: false,
       preferenceExamples,
+      preferenceProfile: savedProfile,
+      styleReferences,
       returnAlternatives: true,
     };
 
