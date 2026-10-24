@@ -49,6 +49,31 @@ const stringList = (value: unknown) =>
     ? value.map((item: string) => item.trim()).filter(Boolean).slice(0, 30)
     : null;
 
+/**
+ * Gemini can change typography when copying source quotes. Reattach only
+ * exact original spans under apostrophe, dash or whitespace differences.
+ */
+export function sourceExcerpt(quote: string, original: string): string {
+  if (original.includes(quote)) return quote;
+  if (!quote.trim()) return "";
+  let pattern = "";
+  let whitespace = false;
+  const reserved = ".?*+^$()[]{}|\\";
+  for (const char of quote) {
+    if (/\s/u.test(char)) {
+      if (!whitespace) pattern += "\\s+";
+      whitespace = true;
+      continue;
+    }
+    whitespace = false;
+    if (/['’‘]/u.test(char)) pattern += "['’‘]";
+    else if (/[-‐‑–—]/u.test(char)) pattern += "[-‐‑–—]";
+    else pattern += reserved.includes(char) ? "\\" + char : char;
+  }
+  const matches = [...original.matchAll(new RegExp(pattern, "gu"))];
+  return matches.length === 1 ? matches[0][0] : "";
+}
+
 function record(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Invalid structured Gemini response");
   return value as Record<string, unknown>;
@@ -129,7 +154,7 @@ export function parseLedger(raw: unknown, original: string): ClaimLedger {
   }
   const claims: Claim[] = obj.claims.map((value, index) => {
     const item = record(value);
-    const source = trimmed(item.source);
+    const source = sourceExcerpt(trimmed(item.source), original);
     const subject = trimmed(item.subject);
     const action = trimmed(item.action);
     const object = trimmed(item.object);
@@ -171,10 +196,22 @@ const extractionRules = [
 export async function extractClaimLedger(original: string, model: string): Promise<ClaimLedger> {
   const claims: Claim[] = [];
   for (const chunk of sourceChunks(original)) {
-    const response = await structuredGemini<unknown>(
-      model, extractionRules, JSON.stringify({ sourceText: chunk }),
-    );
-    const parsed = parseLedger(response, chunk);
+    const input = JSON.stringify({ sourceText: chunk });
+    let response = await structuredGemini<unknown>(model, extractionRules, input);
+    let parsed: ClaimLedger;
+    try {
+      parsed = parseLedger(response, chunk);
+    } catch {
+      // Retry malformed model schemas once; never certify an unanchored claim.
+      response = await structuredGemini<unknown>(
+        model,
+        extractionRules + "\nRipeti: copia source letteralmente; usa subject e action " +
+        "non vuoti; inserisci conditions, negations, relations, protectedTerms " +
+        "e requiredDetails come array (anche vuoti). Non inventare citazioni.",
+        input,
+      );
+      parsed = parseLedger(response, chunk);
+    }
     for (const claim of parsed.claims) claims.push({ ...claim, id: "C" + (claims.length + 1) });
     if (claims.length > 150) throw new Error("Too many claims for safe verification");
   }
