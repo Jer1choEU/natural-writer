@@ -51,14 +51,14 @@ export function assessEditorialCandidate(
   quality: QualityJudgeResult | null
 ): EditorialAssessment {
   if (!semanticGuardPassed) return { eligible: false, score: null, reason: "semantic-guard" };
-  if (!quality) return { eligible: true, score: null, reason: "judge-unavailable" };
+  if (!quality) return { eligible: false, score: null, reason: "judge-unavailable" };
 
   // Conservative hard stops: an attractive paraphrase cannot outrank a faithful
   // text when the judge detects a meaningful loss of subject, scope or meaning.
   if (Math.min(quality.fidelity, quality.semanticPrecision, quality.semanticCoverage) < 7.2) {
     return { eligible: false, score: null, reason: "fidelity" };
   }
-  if (quality.naturalness < 5.5 || quality.concreteness < 5 || quality.editorialGain < 4) {
+  if (quality.naturalness < 5.5 || quality.concreteness < 5 || quality.editorialGain <= 5.5) {
     return { eligible: false, score: null, reason: "naturalness" };
   }
 
