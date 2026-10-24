@@ -59,7 +59,7 @@ Se configurato, lo storico viene salvato permanentemente in Turso e sincronizzat
 - Next.js
 - TypeScript
 - React
-- Gemini Developer API
+- Anthropic Claude Messages API (adapter `lib/claude.ts`)
 - provider e modello configurabili via variabili d'ambiente
 
 ## Configurazione
@@ -67,13 +67,26 @@ Se configurato, lo storico viene salvato permanentemente in Turso e sincronizzat
 Copia `.env.example` in `.env.local` e imposta:
 
 ```bash
-GEMINI_API_KEY=...
-GEMINI_MODEL=gemini-3.5-flash-lite
+ANTHROPIC_API_KEY=...
+CLAUDE_MODEL=claude-sonnet-5-5
+CLAUDE_SEMANTIC_MODEL=claude-haiku-5-5
+CLAUDE_JUDGE_MODEL=claude-haiku-5-5
 TURSO_DATABASE_URL=
 TURSO_AUTH_TOKEN=
 ```
 
 La chiave viene letta solo lato server.
+
+## Migrazione Claude sulla PR #9
+
+La PR #9 sostituisce la generazione Google con l'API Anthropic. La chiave `ANTHROPIC_API_KEY` deve essere salvata soltanto in ambiente server **Preview** durante i test, mai nel repository o in variabili `NEXT_PUBLIC_`.
+
+- Claude Sonnet riscrive; Haiku estrae affermazioni, verifica e valuta le alternative.
+- L'adattatore blocca output vuoti o incompleti e non invia credenziali nella URL.
+- Esegui `npm run claude-check`, `npm run claim-ledger-check`, `npm run typecheck`, `npm run build`.
+- Nessun fallback automatico a Gemini; mantenere la produzione sulla revisione precedente fino a verifica manuale.
+- Turso, sessioni di login, correzioni A/B e Auto-Learning rimangono invariati.
+- Il benchmark live comporta consumi Anthropic ed è disattivato sui push.
 
 ## Avvio locale
 
@@ -86,7 +99,7 @@ Poi apri `http://localhost:3000`.
 
 ## Stato
 
-🟡 **Beta interna funzionale.** Riscrittura con due modalità, confronto A/B, training stilistico aggregato, benchmark e knowledge base M5S sono operativi. Per il deploy serve `GEMINI_API_KEY`; la persistenza tra dispositivi richiede il collegamento delle credenziali Turso sul deployment.
+🟡 **Beta interna funzionale.** Riscrittura con due modalità, confronto A/B, training stilistico aggregato, benchmark e knowledge base M5S sono operativi. Per il deploy serve `ANTHROPIC_API_KEY`; la persistenza tra dispositivi richiede il collegamento delle credenziali Turso sul deployment.
 
 
 ## Regole qualitative
@@ -169,28 +182,30 @@ Il punteggio euristico serve soltanto come segnale tecnico: non sostituisce una 
 
 ### Benchmark da GitHub Actions
 
+Per evitare costi imprevisti il benchmark è solo manuale: non si avvia automaticamente ai push.
+
 È disponibile il workflow manuale **Benchmark Natural Writer**.
 
 Prima dell'esecuzione aggiungi nella repository il secret:
 
 ```
-GEMINI_API_KEY
+ANTHROPIC_API_KEY
 ```
 
 Poi vai in **Actions → Benchmark Natural Writer → Run workflow**.
 
 Puoi scegliere:
 - `benchmark_limit`: numero di testi campione;
-- `model`: modello Gemini da usare.
+- `model`: modello Claude da usare.
 
 Il workflow esegue typecheck, regression check del profilo stilistico, controlli M5S, build, benchmark e carica i risultati come artifact per 14 giorni.
 
 
 ## Provider predefinito
 
-Natural Writer usa **Gemini 3.5 Flash-Lite** come modello predefinito, così il progetto può partire usando il free tier della Gemini Developer API.
+La PR #9 usa **Claude Sonnet 5.5** per le riscritture e **Claude Haiku 5.5** per analisi e verifiche. I costi dell'API sono a consumo; nessun free tier è garantito.
 
-Il provider è isolato dal resto del motore, quindi in futuro sarà possibile aggiungere OpenAI, OpenRouter, Mistral o altri backend senza riscrivere l'interfaccia.
+Il provider è centralizzato in `lib/claude.ts`, senza modificare i contratti dell'interfaccia, il login e la memoria Turso.
 
 
 ## Quality Judge
@@ -200,7 +215,7 @@ Il benchmark combina due livelli di valutazione:
 - **Heuristic score**: segnali tecnici deterministici su lunghezza, ripetizioni, formule generiche e struttura.
 - **Quality Judge**: valutazione editoriale separata su fedeltà, naturalezza, ritmo, specificità e assenza di tic artificiali.
 
-Il judge usa `GEMINI_JUDGE_MODEL` (default: `gemini-3.5-flash-lite`) e viene impiegato anche per scegliere le candidate nella riscrittura ordinaria. Non blocca la generazione se indisponibile.
+Il judge usa `CLAUDE_JUDGE_MODEL` (default: `claude-haiku-5-5`) e viene impiegato anche per scegliere le candidate nella riscrittura ordinaria. Non blocca la generazione se indisponibile.
 
 
 ## Qualità v2 (ottobre 2026)
@@ -219,7 +234,7 @@ Il judge usa `GEMINI_JUDGE_MODEL` (default: `gemini-3.5-flash-lite`) e viene imp
 
 ### Limiti e costi
 
-Il controllo semantico deterministico non può garantire da solo l'equivalenza di tutte le affermazioni. I punteggi automatici non sono una misura certa della paternità umana. La pipeline usa più chiamate a Gemini (incluso il Judge, quando disponibile), quindi testo, intensità e numero di candidate incidono sulla quota. Manca ancora un grande benchmark italiano con valutazioni umane indipendenti. Il training è persistente nel database quando Turso è collegato, con un fallback locale conservativo se la configurazione manca.
+Il controllo semantico deterministico non può garantire da solo l'equivalenza di tutte le affermazioni. I punteggi automatici non sono una misura certa della paternità umana. La pipeline usa più chiamate a Claude (incluso il Judge, quando disponibile), quindi testo, intensità e numero di candidate incidono sulla quota. Manca ancora un grande benchmark italiano con valutazioni umane indipendenti. Il training è persistente nel database quando Turso è collegato, con un fallback locale conservativo se la configurazione manca.
 
 ## Prossimo sviluppo in coda
 
