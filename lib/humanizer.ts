@@ -1,5 +1,6 @@
 import { getPresetRules, type StylePreset } from "@/lib/style-presets";
 import { extractClaimLedger, verifyAndRepair } from "@/lib/claim-ledger";
+import { planEditorialRevision } from "@/lib/editorial-plan";
 import { checkSemanticGuard, formatSemanticIssues } from "@/lib/semantic-guard";
 import { identifyEditorialFlags } from "@/lib/editorial-metrics";
 import { judgeRewrite } from "@/benchmarks/quality-judge";
@@ -722,16 +723,18 @@ export async function humanizeText(text: string, options: HumanizeOptions) {
   // Structured source claims supersede the old free-form semantic skeleton.
   const semanticSkeleton = JSON.stringify(ledger.claims);
   const analysis = detailedPath
-    ? await generateText(
-        buildAnalysisInstructions(options),
-        [
-          "TESTO DIVISO IN PARAGRAFI:", numberedParagraphs(text),
-          ...(knowledgeContext ? ["", knowledgeContext] : []),
-          "PASSAGGI DA VALUTARE:",
-          ...flags.map((flag) => flag.sentence + " — " + flag.reasons.join(", ")),
-        ].join("\n"),
-        selectedModel
-      )
+    ? await planEditorialRevision(text, options.mode, selectedModel)
+        .then((plan) => JSON.stringify(plan))
+        .catch(() => generateText(
+          buildAnalysisInstructions(options),
+          [
+            "TESTO DIVISO IN PARAGRAFI:", numberedParagraphs(text),
+            ...(knowledgeContext ? ["", knowledgeContext] : []),
+            "PASSAGGI DA VALUTARE:",
+            ...flags.map((flag) => flag.sentence + " — " + flag.reasons.join(", ")),
+          ].join("\n"),
+          selectedModel
+        ))
     : flags.map((flag) => flag.sentence + ": " + flag.reasons.join(", ")).join("\n") ||
       "Migliora solo i passaggi che ne hanno bisogno, preservando le formulazioni riuscite.";
 
@@ -914,7 +917,7 @@ export async function humanizeText(text: string, options: HumanizeOptions) {
     : undefined;
 
   const stages = [
-    ...(detailedPath ? ["analysis"] : []),
+    ...(detailedPath ? ["editorial-plan"] : []),
     "claim-ledger",
     "adaptive-multi-candidate-rewrite",
     ...(detailedPath ? ["candidate-ranking"] : []),
