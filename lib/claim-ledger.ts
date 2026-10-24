@@ -44,6 +44,7 @@ export type VerifiedRewrite = {
 const statuses = new Set<ClaimStatus>(["preserved", "partial", "omitted", "altered", "contradicted"]);
 const trimmed = (value: unknown) => typeof value === "string" ? value.trim() : "";
 const stringList = (value: unknown) =>
+  value === undefined || value === null ? [] :
   Array.isArray(value) && value.every((item) => typeof item === "string")
     ? value.map((item: string) => item.trim()).filter(Boolean).slice(0, 30)
     : null;
