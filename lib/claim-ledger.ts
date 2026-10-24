@@ -44,10 +44,12 @@ export type VerifiedRewrite = {
 const statuses = new Set<ClaimStatus>(["preserved", "partial", "omitted", "altered", "contradicted"]);
 const trimmed = (value: unknown) => typeof value === "string" ? value.trim() : "";
 const stringList = (value: unknown) =>
-  value === undefined || value === null ? [] :
   Array.isArray(value) && value.every((item) => typeof item === "string")
     ? value.map((item: string) => item.trim()).filter(Boolean).slice(0, 30)
     : null;
+// Claim metadata arrays are optional; verifier-added claims are NOT optional.
+const claimStringList = (value: unknown) =>
+  value === undefined || value === null ? [] : stringList(value);
 
 /**
  * Gemini can change typography when copying source quotes. Reattach only
@@ -161,11 +163,11 @@ export function parseLedger(raw: unknown, original: string): ClaimLedger {
     const quantity = trimmed(item.quantity);
     const certainty = trimmed(item.certainty);
     const intensity = trimmed(item.intensity);
-    const conditions = stringList(item.conditions);
-    const negations = stringList(item.negations);
-    const relations = stringList(item.relations);
-    const protectedTerms = stringList(item.protectedTerms);
-    const requiredDetails = stringList(item.requiredDetails);
+    const conditions = claimStringList(item.conditions);
+    const negations = claimStringList(item.negations);
+    const relations = claimStringList(item.relations);
+    const protectedTerms = claimStringList(item.protectedTerms);
+    const requiredDetails = claimStringList(item.requiredDetails);
     if (!source || !original.includes(source) || !action || !subject ||
         !conditions || !negations || !relations || !protectedTerms || !requiredDetails) {
       throw new Error("Claim missing mandatory fields or original excerpt");
