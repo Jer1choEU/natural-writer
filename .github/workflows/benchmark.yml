@@ -8,19 +8,9 @@ on:
         required: false
         default: "2"
       models:
-        description: "Modelli Gemini separati da virgola"
+        description: "Modelli Claude separati da virgola"
         required: false
-        default: "gemini-3.5-flash-lite,gemini-3.5-flash,gemini-3.8-flash"
-  push:
-    branches:
-      - main
-    paths:
-      - ".github/workflows/benchmark.yml"
-      - "lib/**"
-      - "benchmarks/**"
-      - "scripts/**"
-      - "package.json"
-      - "tsconfig.json"
+        default: "claude-sonnet-5-5"
 
 jobs:
   benchmark:
@@ -53,17 +43,17 @@ jobs:
 
       - name: Build
         env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: npm run build
 
       - name: Run benchmark
         env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          BENCHMARK_MODELS: ${{ github.event_name == 'workflow_dispatch' && inputs.models || 'gemini-3.5-flash-lite' }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          BENCHMARK_MODELS: ${{ github.event_name == 'workflow_dispatch' && inputs.models || 'claude-sonnet-5-5' }}
           BENCHMARK_LIMIT: ${{ inputs.benchmark_limit || '1' }}
           BENCHMARK_PRESETS: ${{ github.event_name == 'workflow_dispatch' && 'balanced,social-direct,journalistic' || 'balanced' }}
           BENCHMARK_INTENSITIES: media
-          GEMINI_JUDGE_MODEL: gemini-3.5-flash-lite
+          CLAUDE_JUDGE_MODEL: claude-haiku-5-5
         run: npm run benchmark
 
       - name: Upload benchmark results
