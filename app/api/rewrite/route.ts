@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { STYLE_PRESETS, type StylePreset } from "@/lib/style-presets";
 import { analyzeItalianText } from "@/lib/editorial-metrics";
 import {
   humanizeText,
@@ -55,33 +54,17 @@ export async function POST(request: Request) {
 
     const preferenceExamples = cleanPreferenceExamples(body.preferenceExamples);
 
-    const allowedModes = ["natural", "professional", "social"] as const;
-    const allowedIntensities = ["leggera", "media", "profonda"] as const;
-    const allowedPlatforms = ["instagram", "facebook", "linkedin", "x", "threads"] as const;
-
-    const mode = allowedModes.find((value) => value === body.mode) || "social";
-    const intensity = allowedIntensities.find((value) => value === body.intensity) || "media";
-    const preset = Object.prototype.hasOwnProperty.call(STYLE_PRESETS, body.preset)
-      ? body.preset as StylePreset
-      : "balanced";
-    const platform = allowedPlatforms.find((value) => value === body.platform) || "facebook";
-    const lockedTerms = Array.isArray(body.lockedTerms)
-      ? body.lockedTerms.filter((term: unknown): term is string =>
-          typeof term === "string" && term.trim().length > 0
-        ).slice(0, 20).map((term: string) => term.trim().slice(0, 80))
-      : [];
-
+    // Keep the public interface intentionally simple. M5S style is always enabled.
+    const mode: HumanizeOptions["mode"] = body.mode === "natural" ? "natural" : "social";
     const options: HumanizeOptions = {
       mode,
-      platform,
-      tone: typeof body.tone === "string" ? body.tone.slice(0, 60) : "diretto",
-      intensity,
-      preset,
-      emoji: body.emoji === true,
-      cta: body.cta === true,
-      question: body.question === true,
-      politicalStyle: body.politicalStyle === true,
-      lockedTerms,
+      tone: "diretto",
+      intensity: "media",
+      preset: mode === "social" ? "social-direct" : "balanced",
+      politicalStyle: true,
+      emoji: false,
+      cta: false,
+      question: false,
       preferenceExamples,
       returnAlternatives: true,
     };
