@@ -1,12 +1,15 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { STYLE_PRESETS, type StylePreset } from "@/lib/style-presets";
 
 type Alternative = {
   id: "A" | "B";
   text: string;
   similarity?: number;
   strategy?: string;
+  qualityScore?: number | null;
+  semanticGuardPassed?: boolean;
 };
 
 type PreferenceRecord = {
@@ -71,6 +74,24 @@ function readPreferences(): PreferenceRecord[] {
 
 export default function Home() {
   const [input, setInput] = useState("");
+  const [mode, setMode] = useState<"natural" | "professional" | "social">("social");
+  const [intensity, setIntensity] = useState<"leggera" | "media" | "profonda">("media");
+  const [preset, setPreset] = useState<StylePreset>("balanced");
+  const [platform, setPlatform] = useState<"instagram" | "facebook" | "linkedin" | "x" | "threads">("facebook");
+  const [tone, setTone] = useState("diretto");
+  const [politicalStyle, setPoliticalStyle] = useState(false);
+  const [emoji, setEmoji] = useState(false);
+  const [cta, setCta] = useState(false);
+  const [question, setQuestion] = useState(false);
+  const [lockedTermsInput, setLockedTermsInput] = useState("");
+  const [selectedFragment, setSelectedFragment] = useState<{ index: number; start: number; end: number } | null>(null);
+  const [fragmentBusyIndex, setFragmentBusyIndex] = useState<number | null>(null);
+  const [fragmentError, setFragmentError] = useState("");
+  const lockedTerms = useMemo(() =>
+    lockedTermsInput.split(/\n/).map((term) => term.trim()).filter(Boolean).slice(0, 20),
+    [lockedTermsInput]
+  );
+
   const [alternatives, setAlternatives] = useState<Alternative[]>([]);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [preferenceCount, setPreferenceCount] = useState(0);
@@ -101,6 +122,8 @@ export default function Home() {
     setError("");
     setAlternatives([]);
     setSelectedIndex(null);
+    setSelectedFragment(null);
+    setFragmentError("");
 
     try {
       const storedPreferences = readPreferences();
@@ -112,6 +135,16 @@ export default function Home() {
         body: JSON.stringify({
           text: input,
           preferenceExamples,
+          mode,
+          intensity,
+          preset,
+          platform,
+          tone,
+          politicalStyle,
+          lockedTerms,
+          emoji,
+          cta,
+          question,
         }),
       });
 
@@ -144,6 +177,56 @@ export default function Home() {
       setError(err instanceof Error ? err.message : "Errore imprevisto.");
     } finally {
       setLoading(false);
+    }
+  }
+
+  function updateAlternative(index: number, text: string) {
+    setAlternatives((current) =>
+      current.map((candidate, candidateIndex) =>
+        candidateIndex === index ? { ...candidate, text } : candidate
+      )
+    );
+    setSelectedFragment(null);
+  }
+
+  async function rewriteSelection(index: number) {
+    const selection = selectedFragment;
+    const current = alternatives[index];
+    if (!selection || selection.index !== index || !current || fragmentBusyIndex !== null) return;
+    const fragment = current.text.slice(selection.start, selection.end);
+    if (!fragment.trim()) return;
+
+    setFragmentBusyIndex(index);
+    setFragmentError("");
+    try {
+      const response = await fetch("/api/rewrite-fragment", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fragment,
+          context: current.text,
+          mode,
+          intensity,
+          lockedTerms,
+          politicalStyle,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok || typeof data.text !== "string") {
+        throw new Error(data.error || "La riscrittura locale non è riuscita.");
+      }
+      // Use the text captured at selection time, avoiding edits on a stale selection.
+      if (alternatives[index]?.text !== current.text) {
+        throw new Error("Il testo è cambiato: seleziona nuovamente il passaggio.");
+      }
+      updateAlternative(index,
+        current.text.slice(0, selection.start) + data.text + current.text.slice(selection.end)
+      );
+    } catch (error) {
+      setFragmentError(error instanceof Error ? error.message : "Errore nella riscrittura locale.");
+    } finally {
+      setFragmentBusyIndex(null);
+      setSelectedFragment(null);
     }
   }
 
